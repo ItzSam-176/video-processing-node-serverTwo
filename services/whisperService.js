@@ -173,21 +173,12 @@ class WhisperService {
     }
   }
 
-  // ✅ Helper function to handle Indian languages specifically
-  getWhisperLanguageCode(selectedLanguage) {
-    // Only force Hindi and Gujarati, let others auto-detect
-    if (selectedLanguage === "hi") {
-      return "hi"; // Force Hindi
-    } else if (selectedLanguage === "gu") {
-      return "gu"; // Force Gujarati
-    } else {
-      return selectedLanguage === "auto" ? null : selectedLanguage; // Keep international languages as-is
-    }
-  }
 
+  // ✅ MAIN: Generate subtitles using Whisper's exact timestamps
   async generateSubtitles(inputPath, params) {
-    console.log("[WHISPER] Starting subtitle generation");
-    console.log(`[WHISPER] Selected language: ${params.language}`);
+    console.log(
+      "[WHISPER] Starting subtitle generation with Whisper timestamps"
+    );
 
     try {
       await this.initialize();
@@ -198,15 +189,13 @@ class WhisperService {
         params.trimEnd
       );
 
-      // ✅ Use helper function to determine language setting
-      const whisperLanguage = this.getWhisperLanguageCode(params.language);
-      console.log(`[WHISPER] Using Whisper language code: ${whisperLanguage}`);
+      console.log("[WHISPER] Running Whisper transcription...");
 
       const result = await nodewhisper(audioPath, {
         modelName: this.modelName,
         autoDownloadModelName: this.modelName,
         whisperOptions: {
-          language: whisperLanguage, // ✅ Forced for Hindi/Gujarati, auto-detect for others
+          language: params.language === "auto" ? null : params.language,
           task: params.translateToEnglish ? "translate" : "transcribe",
           gen_file_txt: false,
           gen_file_subtitle: false,
@@ -221,8 +210,12 @@ class WhisperService {
         },
       });
 
+      console.log("[WHISPER] Whisper result type:", typeof result);
+
+      // ✅ Parse using Whisper's direct output
       const subtitles = this.parseWhisperOutput(result, params.trimStart || 0);
 
+      // Cleanup
       fs.remove(audioPath).catch(() => {});
 
       console.log(
@@ -232,7 +225,7 @@ class WhisperService {
       return {
         success: true,
         subtitles: subtitles,
-        detected_language: whisperLanguage || "auto-detected",
+        detected_language: "en",
         segments_count: subtitles.length,
         message: `Generated ${subtitles.length} timed subtitle segments`,
       };
@@ -241,67 +234,6 @@ class WhisperService {
       throw new Error(`Whisper transcription failed: ${error.message}`);
     }
   }
-
-  // ✅ MAIN: Generate subtitles using Whisper's exact timestamps
-  // async generateSubtitles(inputPath, params) {
-  //   console.log(
-  //     "[WHISPER] Starting subtitle generation with Whisper timestamps"
-  //   );
-
-  //   try {
-  //     await this.initialize();
-
-  //     const audioPath = await this.extractAudio(
-  //       inputPath,
-  //       params.trimStart,
-  //       params.trimEnd
-  //     );
-
-  //     console.log("[WHISPER] Running Whisper transcription...");
-
-  //     const result = await nodewhisper(audioPath, {
-  //       modelName: this.modelName,
-  //       autoDownloadModelName: this.modelName,
-  //       whisperOptions: {
-  //         language: params.language === "auto" ? null : params.language,
-  //         task: params.translateToEnglish ? "translate" : "transcribe",
-  //         gen_file_txt: false,
-  //         gen_file_subtitle: false,
-  //         gen_file_vtt: false,
-  //         word_timestamps: true,
-  //         timestamp_size: 23,
-  //         max_len: 30,
-  //         split_on_word: true,
-  //         no_speech_threshold: 0.6,
-  //         condition_on_previous_text: false,
-  //         compression_ratio_threshold: 2.4,
-  //       },
-  //     });
-
-  //     console.log("[WHISPER] Whisper result type:", typeof result);
-
-  //     // ✅ Parse using Whisper's direct output
-  //     const subtitles = this.parseWhisperOutput(result, params.trimStart || 0);
-
-  //     // Cleanup
-  //     fs.remove(audioPath).catch(() => {});
-
-  //     console.log(
-  //       `[WHISPER] Generated ${subtitles.length} timed subtitle segments`
-  //     );
-
-  //     return {
-  //       success: true,
-  //       subtitles: subtitles,
-  //       detected_language: "en",
-  //       segments_count: subtitles.length,
-  //       message: `Generated ${subtitles.length} timed subtitle segments`,
-  //     };
-  //   } catch (error) {
-  //     console.error("[WHISPER] Subtitle generation failed:", error);
-  //     throw new Error(`Whisper transcription failed: ${error.message}`);
-  //   }
-  // }
 }
 
 module.exports = new WhisperService();
