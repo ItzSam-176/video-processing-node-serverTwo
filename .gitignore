@@ -1,0 +1,326 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript v1 declaration files
+typings/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.local
+.env.production
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ===========================================
+# PROJECT-SPECIFIC IGNORES
+# ===========================================
+
+# Video processing files
+uploads/
+processed/
+temp/
+
+# Font files (if downloaded)
+fonts/*.ttf
+fonts/*.otf
+
+# Generated thumbnails
+thumbnails/
+
+# Audio processing temp files
+*.wav
+*.mp3
+*.m4a
+*.aac
+
+# Video temp files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# Image temp files
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# FFmpeg temp files
+ffmpeg_*
+*.ffpreset
+
+# Whisper model files (can be large)
+models/
+
+# Log files specific to video processing
+processing.log
+whisper.log
+ffmpeg.log
+
+# PM2 logs and pids
+.pm2/
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows specific
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+
+# Dump file
+*.stackdump
+
+# Folder config file
+[Dd]esktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# Linux specific
+*~
+
+# temporary files which can be created if a process still has a handle open of a deleted file
+.fuse_hidden*
+
+# KDE directory preferences
+.directory
+
+# Linux trash folder which might appear on any partition or disk
+.Trash-*
+
+# .nfs files are created when an open file is removed but is still being accessed
+.nfs*
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Editor backup files
+*~
+.*.swp
+.*.swo
+
+# OS generated files
+.DS_Store?
+Icon?
+
+# Package managers
+package-lock.json.backup
+yarn.lock.backup
+
+# ===========================================
+# DEVELOPMENT & TESTING
+# ===========================================
+
+# Test coverage reports
+coverage/
+.nyc_output/
+
+# Jest
+jest_*
+__tests__/
+
+# Mocha
+.mocha.opts
+
+# Testing temp files
+test-results/
+test-output/
+
+# ===========================================
+# DEPLOYMENT & PRODUCTION
+# ===========================================
+
+# Build artifacts
+build/
+dist/
+
+# Production config files (keep templates)
+config/production.js
+config/staging.js
+
+# SSL certificates
+*.pem
+*.key
+*.cert
+*.crt
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Redis dump
+dump.rdb
+
+# ===========================================
+# IGNORE SPECIFIC FILE PATTERNS
+# ===========================================
+
+# Ignore all video files except sample
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.flv
+*.wmv
+!sample.*
+
+# Ignore all audio files except sample
+*.mp3
+*.wav
+*.flac
+*.aac
+*.m4a
+*.ogg
+!sample.*
+
+# Ignore large image files
+*.raw
+*.tiff
+*.bmp
+!sample.*
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archive files
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+
+# Keep important sample files
+!samples/
