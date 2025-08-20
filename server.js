@@ -11,6 +11,10 @@ app.use(cors());
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
+const multer = require("multer");
+const upload = multer({ dest: path.join(__dirname, "uploads") });
+const whisperService = require("./services/whisperService");
+
 // Create directories on startup
 const createDirectories = async () => {
   const dirs = ["uploads", "processed", "temp", "models"];
@@ -39,30 +43,32 @@ app.post(
 );
 
 // New endpoint: /generate-subtitles-only
-app.post('/generate-subtitles-only', upload.single('video'), async (req, res) => {
-  try {
-    const { language = 'auto', translate_to_english = 'false' } = req.body;
-    
-    // Generate subtitles using Whisper
-    const subtitles = await whisperService.generateSubtitles(req.file.path, {
-      language,
-      translateToEnglish: translate_to_english === 'true'
-    });
-    
-    // Return ONLY subtitle data (no video processing)
-    res.json({
-      success: true,
-      subtitles: subtitles,
-      videoMetadata: {
-        duration: videoDuration,
-        originalName: req.file.originalname
-      }
-    });
-    
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+app.post(
+  "/generate-subtitles-only",
+  upload.single("video"),
+  async (req, res) => {
+    try {
+      const { language = "auto", translate_to_english = "false" } = req.body;
+
+      // Generate subtitles using Whisper
+      const subtitles = await whisperService.generateSubtitles(req.file.path, {
+        language,
+        translateToEnglish: translate_to_english === "true",
+      });
+
+      // Return ONLY subtitles object
+      res.json({
+        success: true,
+        subtitles: subtitles,
+        videoMetadata: {
+          originalName: req.file.originalname,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 
 // Serve processed files
