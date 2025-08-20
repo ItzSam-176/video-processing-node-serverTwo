@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 
 class WhisperService {
   constructor() {
-    this.modelName = "tiny";
+    this.modelName = "small";
     this.initialized = false;
   }
 
@@ -135,7 +135,6 @@ class WhisperService {
   }
 
   // ✅ FIXED: Convert timestamp to seconds
-  // ✅ FIXED: Convert timestamp to seconds with proper parsing
   timestampToSeconds(timestamp) {
     try {
       if (!timestamp || typeof timestamp !== "string") {
