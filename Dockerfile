@@ -1,26 +1,36 @@
-# Dockerfile
 FROM node:18-slim
 
-# Install FFmpeg and system dependencies
+# Install ALL required system dependencies for video processing with Whisper
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
+    cmake \
+    build-essential \
+    git \
     python3 \
-    make \
-    g++ \
+    ffmpeg \
+    wget \
+    curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first (better layer caching)
 COPY package*.json ./
-RUN npm ci --only=production
+
+# Install Node.js dependencies
+RUN npm ci --production
 
 # Copy source code
-COPY . .
+COPY . ./
 
-# Create necessary directories
-RUN mkdir -p temp uploads processed models subtitles
+# Create required directories
+RUN mkdir -p temp uploads processed models
 
+# Pre-download Whisper model to avoid runtime failures
+RUN npx nodejs-whisper download small
+
+# Expose port
 EXPOSE 5000
 
+# Start the application
 CMD ["node", "server.js"]
