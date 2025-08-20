@@ -27,7 +27,7 @@ COPY . ./
 RUN mkdir -p temp uploads processed models
 
 # Pre-download Whisper model to avoid runtime failures
-RUN npx nodejs-whisper download small
+RUN npx nodejs-whisper download tiny
 
 # Expose port
 EXPOSE 5000

@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 
 class WhisperService {
   constructor() {
-    this.modelName = "small";
+    this.modelName = "tiny";
     this.initialized = false;
   }
 
