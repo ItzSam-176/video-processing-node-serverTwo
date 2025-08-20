@@ -38,6 +38,33 @@ app.post(
   require("./controllers/subtitleController").generateSubtitles
 );
 
+// New endpoint: /generate-subtitles-only
+app.post('/generate-subtitles-only', upload.single('video'), async (req, res) => {
+  try {
+    const { language = 'auto', translate_to_english = 'false' } = req.body;
+    
+    // Generate subtitles using Whisper
+    const subtitles = await whisperService.generateSubtitles(req.file.path, {
+      language,
+      translateToEnglish: translate_to_english === 'true'
+    });
+    
+    // Return ONLY subtitle data (no video processing)
+    res.json({
+      success: true,
+      subtitles: subtitles,
+      videoMetadata: {
+        duration: videoDuration,
+        originalName: req.file.originalname
+      }
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // Serve processed files
 app.use("/processed-videos", express.static("processed"));
 
