@@ -1,52 +1,27 @@
-FROM node:18-slim
+FROM node:18-alpine
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    cmake \
-    build-essential \
-    git \
-    python3 \
-    python3-pip \
-    python3-dev \
-    python3-venv \
-    ffmpeg \
-    wget \
-    curl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# Install minimal dependencies
+RUN apk add --no-cache python3 py3-pip ffmpeg
 
 WORKDIR /app
 
-# Copy package files first
+# Copy package files first for better caching
 COPY package*.json ./
 
 # Install Node.js dependencies
-RUN npm ci --production
+RUN npm ci --production --silent
 
 # Copy source code
 COPY . ./
 
-# Create required directories
+# Create directories
 RUN mkdir -p temp uploads processed models
 
-# ✅ BEST PRACTICE: Create virtual environment
-RUN python3 -m venv /opt/venv
+# Install whisper efficiently
+RUN pip install --break-system-packages openai-whisper
 
-# ✅ Set PATH to use virtual environment
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install whisper in the virtual environment
-RUN pip install --upgrade pip
-RUN pip install openai-whisper
-
-# Verify whisper installation
-RUN whisper --help
-
-# Pre-download nodejs-whisper model
+# Download model at build time (small model)
 RUN npx nodejs-whisper download tiny
 
-# Expose port
 EXPOSE 5000
-
-# Start the application
 CMD ["node", "server.js"]
