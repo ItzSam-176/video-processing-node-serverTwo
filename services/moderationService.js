@@ -92,7 +92,7 @@ class ModerationService {
     });
   }
 
-  async moderateVisualContent(videoPath) {
+  async moderateVisualContent(videoPath,options = {}) {
     if (!this.initialized) {
       await this.initialize();
     }

@@ -1,11 +1,13 @@
 FROM node:18-slim
 
-# Install ALL required system dependencies for video processing with nodejs-whisper
+# Install ALL required dependencies including whisper-cli
 RUN apt-get update && apt-get install -y \
     cmake \
     build-essential \
     git \
     python3 \
+    python3-pip \
+    python3-dev \
     ffmpeg \
     wget \
     curl \
@@ -14,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy package files first (better layer caching)
+# Copy package files first
 COPY package*.json ./
 
 # Install Node.js dependencies
@@ -26,7 +28,13 @@ COPY . ./
 # Create required directories
 RUN mkdir -p temp uploads processed models
 
-# Pre-download nodejs-whisper model (tiny model for speed)
+# ✅ FIX: Install whisper-cli (this was missing!)
+RUN pip3 install --upgrade openai-whisper
+
+# Verify whisper installation
+RUN whisper --help
+
+# Pre-download nodejs-whisper model
 RUN npx nodejs-whisper download tiny
 
 # Expose port

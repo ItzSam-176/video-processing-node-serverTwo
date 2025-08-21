@@ -246,10 +246,14 @@ app.post(
 
       if (!overallFlagged) {
         // ✅ SAFE RESPONSE - Show all details when safe
+        // ✅ SAFE: Add proper null checks
         return res.json({
           safe: true,
           message: "✅ Content is safe to use",
-          videoDuration: req.file ? visualResult.videoDuration + "s" : "N/A",
+          videoDuration:
+            req.file && visualResult.videoDuration
+              ? `${visualResult.videoDuration}s`
+              : "N/A",
           summary: {
             contentTypes: {
               video: req.file ? "checked" : "not_provided",
@@ -257,8 +261,8 @@ app.post(
               text: req.body.text ? "checked" : "not_provided",
             },
             totalChecks: {
-              framesChecked: visualResult.totalFramesChecked,
-              audioSegmentsChecked: audioResult.totalSubtitlesChecked,
+              framesChecked: visualResult.totalFramesChecked || 0,
+              audioSegmentsChecked: audioResult.totalSubtitlesChecked || 0,
               textProvided: !!req.body.text,
             },
           },
