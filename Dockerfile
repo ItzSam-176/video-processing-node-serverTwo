@@ -8,10 +8,14 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-dev \
+    python3-setuptools \
+    python3-wheel \
     ffmpeg \
     wget \
     curl \
     ca-certificates \
+    pkg-config \
+    rust-all \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -28,8 +32,11 @@ COPY . ./
 # Create required directories
 RUN mkdir -p temp uploads processed models
 
-# Install OpenAI Whisper CLI (this was missing!)
-RUN pip3 install --upgrade pip && pip3 install openai-whisper
+# Upgrade pip and setuptools first
+RUN python3 -m pip install --upgrade pip setuptools wheel
+
+# Install OpenAI Whisper from GitHub (more reliable than PyPI)
+RUN pip3 install "git+https://github.com/openai/whisper.git"
 
 # Verify Whisper installation
 RUN whisper --help
