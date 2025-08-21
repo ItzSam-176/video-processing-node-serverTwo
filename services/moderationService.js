@@ -43,18 +43,22 @@ class ModerationService {
     const videoDuration = await this.getVideoDuration(videoPath);
     const framePrefix = `frame_${Date.now()}`;
 
-    const frameTimestamps = [
-      videoDuration * 0.1,
-      videoDuration * 0.25,
-      videoDuration * 0.5,
-      videoDuration * 0.75,
-      videoDuration * 0.9,
-    ];
+    // ✅ IMPROVED: More frames, smarter distribution
+    const frameCount = Math.min(Math.max(8, Math.ceil(videoDuration / 10)), 20);
+    const timestamps = [];
+
+    // Random sampling within segments to avoid predictable patterns
+    for (let i = 0; i < frameCount; i++) {
+      const segmentStart = (videoDuration / frameCount) * i;
+      const segmentEnd = (videoDuration / frameCount) * (i + 1);
+      const randomOffset = Math.random() * (segmentEnd - segmentStart);
+      timestamps.push(segmentStart + randomOffset);
+    }
 
     return new Promise((resolve, reject) => {
       ffmpeg(videoPath)
         .screenshots({
-          timestamps: frameTimestamps.map((t) => t.toFixed(2)),
+          timestamps: timestamps.map((t) => t.toFixed(2)),
           filename: `${framePrefix}_%03d.png`,
           folder: tempDir,
           size: "224x224",
@@ -65,18 +69,13 @@ class ModerationService {
             .filter((file) => file.startsWith(framePrefix))
             .map((file, index) => ({
               path: path.join(tempDir, file),
-              timestamp: frameTimestamps[index],
+              timestamp: timestamps[index],
             }));
 
-          console.log(
-            `[MODERATION] Extracted ${files.length} frames with timestamps`
-          );
+          console.log(`[MODERATION] Extracted ${files.length} enhanced frames`);
           resolve({ files, videoDuration });
         })
-        .on("error", (error) => {
-          console.error("[MODERATION] Frame extraction failed:", error);
-          reject(error);
-        });
+        .on("error", reject);
     });
   }
 
