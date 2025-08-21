@@ -9,16 +9,16 @@ class WhisperService {
     this.modelName = "tiny";
     this.initialized = false;
   }
-
   async initialize() {
     if (this.initialized) return;
 
     try {
-      console.log("[WHISPER] Initializing Whisper model...");
+      console.log("[WHISPER] Initializing and downloading model...");
+      // Download model at runtime if not exists
+      await this.ensureModelExists();
       this.initialized = true;
-      console.log("[WHISPER] Model initialized successfully");
     } catch (error) {
-      console.error("[WHISPER] Model initialization failed:", error);
+      console.error("[WHISPER] Initialization failed:", error);
       throw error;
     }
   }
@@ -171,7 +171,6 @@ class WhisperService {
       return 0;
     }
   }
-
 
   // ✅ MAIN: Generate subtitles using Whisper's exact timestamps
   async generateSubtitles(inputPath, params) {
