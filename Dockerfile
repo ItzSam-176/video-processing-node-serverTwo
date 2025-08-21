@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     wget \
     curl \
-@@ -26,11 +28,17 @@
+    
 # Create required directories
 RUN mkdir -p temp uploads processed models
 
