@@ -1,17 +1,19 @@
 FROM node:18-slim
 
-WORKDIR /app
-
-# Copy everything
-COPY . ./
-
-# Make build script executable and run it
-RUN chmod +x ./build.sh && ./build.sh
-
+# Install ALL required system dependencies for video processing with Whisper
+RUN apt-get update && apt-get install -y \
+    cmake \
+    build-essential \
+    git \
+    python3 \
+    ffmpeg \
+    wget \
+    curl \
+@@ -26,11 +28,17 @@
 # Create required directories
 RUN mkdir -p temp uploads processed models
 
-# Pre-download Whisper model
+# Pre-download Whisper model to avoid runtime failures
 RUN npx nodejs-whisper download tiny
 
 # Expose port
