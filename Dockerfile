@@ -1,6 +1,6 @@
 FROM node:18-slim
 
-# Install ALL required system dependencies for video processing with Whisper
+# Install ALL required system dependencies for video processing with nodejs-whisper
 RUN apt-get update && apt-get install -y \
     cmake \
     build-essential \
@@ -9,11 +9,24 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     wget \
     curl \
-    
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files first (better layer caching)
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm ci --production
+
+# Copy source code
+COPY . ./
+
 # Create required directories
 RUN mkdir -p temp uploads processed models
 
-# Pre-download Whisper model to avoid runtime failures
+# Pre-download nodejs-whisper model (tiny model for speed)
 RUN npx nodejs-whisper download tiny
 
 # Expose port
