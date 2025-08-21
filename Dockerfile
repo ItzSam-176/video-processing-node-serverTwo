@@ -1,17 +1,22 @@
-FROM node:18-alpine
+FROM node:18-slim
 
-RUN apk add --no-cache python3 py3-pip ffmpeg
+# Install minimal dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --production --silent
+RUN npm ci --production
 
 COPY . ./
 RUN mkdir -p temp uploads processed models
 
-# Only install whisper, don't download model
-RUN pip install --break-system-packages openai-whisper
+RUN pip3 install --break-system-packages openai-whisper
+RUN npx nodejs-whisper download tiny
 
 EXPOSE 5000
 CMD ["node", "server.js"]
