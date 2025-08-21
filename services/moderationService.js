@@ -110,36 +110,43 @@ class ModerationService {
         const exactTimestamp = frameData.timestamp;
 
         const imageBuffer = await fs.readFile(framePath);
-        const imageTensor = tf.node.decodeImage(imageBuffer, 3);
 
-        const predictions = await this.nsfwModel.classify(imageTensor);
-        imageTensor.dispose();
+        let imageTensor; // ✅ Declare outside try block
+        try {
+          imageTensor = tf.node.decodeImage(imageBuffer, 3);
+          const predictions = await this.nsfwModel.classify(imageTensor);
 
-        const pornScore =
-          predictions.find((p) => p.className === "Porn")?.probability || 0;
-        const sexyScore =
-          predictions.find((p) => p.className === "Sexy")?.probability || 0;
-        const hentaiScore =
-          predictions.find((p) => p.className === "Hentai")?.probability || 0;
+          const pornScore =
+            predictions.find((p) => p.className === "Porn")?.probability || 0;
+          const sexyScore =
+            predictions.find((p) => p.className === "Sexy")?.probability || 0;
+          const hentaiScore =
+            predictions.find((p) => p.className === "Hentai")?.probability || 0;
 
-        const isInappropriate =
-          pornScore > 0.6 || sexyScore > 0.8 || hentaiScore > 0.7;
+          const isInappropriate =
+            pornScore > 0.6 || sexyScore > 0.8 || hentaiScore > 0.7;
 
-        if (isInappropriate) {
-          flaggedFrames.push({
-            frameIndex: i,
-            exactTimestamp: Math.round(exactTimestamp * 100) / 100,
-            timestampFormatted: this.formatDuration(exactTimestamp),
-            estimatedDuration: "~1-2 seconds",
-            scores: {
-              porn: Math.round(pornScore * 100) / 100,
-              sexy: Math.round(sexyScore * 100) / 100,
-              hentai: Math.round(hentaiScore * 100) / 100,
-            },
-          });
+          if (isInappropriate) {
+            flaggedFrames.push({
+              frameIndex: i,
+              exactTimestamp: Math.round(exactTimestamp * 100) / 100,
+              timestampFormatted: this.formatDuration(exactTimestamp),
+              estimatedDuration: "~1-2 seconds",
+              scores: {
+                porn: Math.round(pornScore * 100) / 100,
+                sexy: Math.round(sexyScore * 100) / 100,
+                hentai: Math.round(hentaiScore * 100) / 100,
+              },
+            });
+          }
+        } finally {
+          // ✅ CORRECT: Dispose tensor after each frame
+          if (imageTensor) {
+            imageTensor.dispose();
+          }
+          // ✅ Clean up frame file
+          await fs.remove(framePath).catch(() => {}); // Ignore cleanup errors
         }
-
-        await fs.remove(framePath);
       }
 
       return {
@@ -279,7 +286,9 @@ class ModerationService {
         textResult
       );
 
-      console.log(`[MODERATION] Complete - Flagged: ${overallFlagged}, Confidence: ${confidence}`);
+      console.log(
+        `[MODERATION] Complete - Flagged: ${overallFlagged}, Confidence: ${confidence}`
+      );
 
       return {
         flagged: overallFlagged,
