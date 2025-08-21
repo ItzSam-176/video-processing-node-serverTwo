@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     git \
     python3 \
+    python3-pip \
+    python3-dev \
     ffmpeg \
     wget \
     curl \
@@ -25,6 +27,12 @@ COPY . ./
 
 # Create required directories
 RUN mkdir -p temp uploads processed models
+
+# Install OpenAI Whisper CLI (this was missing!)
+RUN pip3 install --upgrade pip && pip3 install openai-whisper
+
+# Verify Whisper installation
+RUN whisper --help
 
 # Pre-download Whisper model to avoid runtime failures
 RUN npx nodejs-whisper download tiny
