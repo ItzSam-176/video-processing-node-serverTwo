@@ -12,7 +12,7 @@ const path = require("path");
 const fs = require("fs-extra");
 // ✅ IMPORT: Use your existing WhisperService
 const whisperService = require("./whisperService");
-
+const config = require("../config/moderation");
 class ModerationService {
   constructor() {
     this.nsfwModel = null;
@@ -122,8 +122,14 @@ class ModerationService {
           const hentaiScore =
             predictions.find((p) => p.className === "Hentai")?.probability || 0;
 
+          const thresholds = this.getThresholds(
+            options.strictnessLevel || "moderate"
+          );
+
           const isInappropriate =
-            pornScore > 0.6 || sexyScore > 0.8 || hentaiScore > 0.7;
+            pornScore > thresholds.porn ||
+            sexyScore > thresholds.sexy ||
+            hentaiScore > thresholds.hentai;
 
           if (isInappropriate) {
             flaggedFrames.push({
@@ -256,12 +262,12 @@ class ModerationService {
   }
 
   // ✅ UPDATED: Use WhisperService for audio transcription
-  async moderateVideo(videoPath, subtitles = []) {
+  async moderateVideo(videoPath, subtitles = [], options = {}) {
     try {
       console.log("[MODERATION] Starting complete video moderation...");
 
       // Visual content moderation
-      const visualResult = await this.moderateVisualContent(videoPath);
+      const visualResult = await this.moderateVisualContent(videoPath, options);
 
       // ✅ UPDATED: Extract and transcribe audio using WhisperService if no subtitles provided
       let audioTranscription = subtitles;
@@ -328,6 +334,10 @@ class ModerationService {
   filterText(text) {
     const matches = this.matcher.getAllMatches(text);
     return this.censor.applyTo(text, matches);
+  }
+
+  getThresholds(strictnessLevel = "moderate") {
+    return config.strictnessLevels[strictnessLevel] || config.thresholds;
   }
 }
 

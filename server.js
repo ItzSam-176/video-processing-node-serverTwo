@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -81,9 +82,14 @@ app.post("/process-video-safe", upload.single("video"), async (req, res) => {
       });
     }
 
+    const strictnessLevel =
+      req.body.strictness ||
+      req.headers["x-moderation-strictness"] ||
+      "moderate";
     // Step 1: Safety check first
     const moderationResult = await moderationService.moderateVisualContent(
-      req.file.path
+      req.file.path,
+      { strictnessLevel }
     );
 
     if (moderationResult.flagged) {
@@ -146,12 +152,16 @@ app.post(
         totalSubtitlesChecked: 0,
       };
       let textResult = { flagged: false, flaggedText: null };
-
+      const strictnessLevel =
+        req.body.strictness ||
+        req.headers["x-moderation-strictness"] ||
+        "moderate";
       // 1. Video Visual Moderation (if video file provided)
       if (req.file) {
         console.log("[SAFETY-CHECK] Checking video visual content...");
         visualResult = await moderationService.moderateVisualContent(
-          req.file.path
+          req.file.path,
+          { strictnessLevel }
         );
       }
 
