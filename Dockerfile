@@ -1,6 +1,6 @@
 FROM node:18-slim
 
-# Install ALL required dependencies including whisper-cli
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     cmake \
     build-essential \
@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-dev \
+    python3-venv \
     ffmpeg \
     wget \
     curl \
@@ -28,8 +29,15 @@ COPY . ./
 # Create required directories
 RUN mkdir -p temp uploads processed models
 
-# ✅ FIX: Install whisper-cli (this was missing!)
-RUN pip3 install --upgrade openai-whisper
+# ✅ BEST PRACTICE: Create virtual environment
+RUN python3 -m venv /opt/venv
+
+# ✅ Set PATH to use virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install whisper in the virtual environment
+RUN pip install --upgrade pip
+RUN pip install openai-whisper
 
 # Verify whisper installation
 RUN whisper --help
