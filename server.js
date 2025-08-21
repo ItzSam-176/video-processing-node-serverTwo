@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs-extra");
-const ffmpeg = require("fluent-ffmpeg");
 const { englishDataset } = require("obscenity");
 
 const app = express();
@@ -73,23 +72,24 @@ app.post(
   }
 );
 
-
-// ✅ ADD: Enhanced process-video with safety check
+// ✅ Enhanced process-video with safety check
 app.post("/process-video-safe", upload.single("video"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        message: "No video file provided" 
+      return res.status(400).json({
+        message: "No video file provided",
       });
     }
 
     // Step 1: Safety check first
-    const moderationResult = await moderationService.moderateVisualContent(req.file.path);
-    
+    const moderationResult = await moderationService.moderateVisualContent(
+      req.file.path
+    );
+
     if (moderationResult.flagged) {
       const issues = [];
-      
-      moderationResult.flaggedFrames.forEach(frame => {
+
+      moderationResult.flaggedFrames.forEach((frame) => {
         const scores = frame.scores;
         if (scores.porn > 0.6) issues.push("Adult content");
         if (scores.sexy > 0.8) issues.push("Suggestive content");
@@ -100,23 +100,24 @@ app.post("/process-video-safe", upload.single("video"), async (req, res) => {
         safe: false,
         message: "❌ Cannot process video - inappropriate content detected",
         issues: [...new Set(issues)],
-        blocked: true
+        blocked: true,
       });
     }
 
     // Step 2: Video is safe - process normally
-    console.log(`[SAFE-PROCESSING] ✅ Video passed safety check, processing...`);
-    
+    console.log(
+      `[SAFE-PROCESSING] ✅ Video passed safety check, processing...`
+    );
+
     // Call your existing video processing logic here
     const videoController = require("./controllers/videoController");
     return videoController.processVideo(req, res);
-
   } catch (error) {
-    console.error('[SAFE-PROCESSING] Error:', error);
-    res.status(500).json({ 
+    console.error("[SAFE-PROCESSING] Error:", error);
+    res.status(500).json({
       safe: false,
-      message: "Processing failed", 
-      error: error.message 
+      message: "Processing failed",
+      error: error.message,
     });
   }
 });
@@ -154,13 +155,12 @@ app.post(
         );
       }
 
-      // 2. Audio Moderation (extract speech from video if provided)
+      // 2. Audio Moderation (✅ CLEANED UP: Use moderationService)
       if (req.file) {
         console.log("[SAFETY-CHECK] Extracting and checking audio content...");
         try {
-          const audioTranscription = await extractAudioAndTranscribe(
-            req.file.path
-          );
+          const audioTranscription =
+            await moderationService.extractAndTranscribeAudio(req.file.path);
           if (audioTranscription && audioTranscription.length > 0) {
             audioResult =
               moderationService.moderateTextContent(audioTranscription);
@@ -363,49 +363,7 @@ app.post(
   }
 );
 
-// Helper function to extract audio and transcribe to text
-async function extractAudioAndTranscribe(videoPath) {
-  const path = require("path");
-  const fs = require("fs-extra");
-
-  return new Promise((resolve, reject) => {
-    const tempDir = path.join(__dirname, "../temp");
-    const audioFileName = `audio_${Date.now()}.wav`;
-    const audioPath = path.join(tempDir, audioFileName);
-
-    // Extract audio from video
-    ffmpeg(videoPath)
-      .output(audioPath)
-      .audioChannels(1)
-      .audioFrequency(16000)
-      .format("wav")
-      .on("end", async () => {
-        try {
-          const transcription = await transcribeAudio(audioPath);
-          await fs.remove(audioPath);
-          resolve(transcription);
-        } catch (transcribeError) {
-          await fs.remove(audioPath).catch(() => {});
-          reject(transcribeError);
-        }
-      })
-      .on("error", (error) => {
-        reject(new Error(`Audio extraction failed: ${error.message}`));
-      })
-      .run();
-  });
-}
-
-async function transcribeAudio(audioPath) {
-  return [
-    {
-      start: 0,
-      end: 3,
-      text: "Sample transcribed text from audio",
-    },
-  ];
-}
-
+// ✅ KEPT: Helper function (used in response formatting)
 function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
@@ -419,9 +377,6 @@ function formatDuration(seconds) {
     return `${secs}.${ms.toString().padStart(2, "0")}s`;
   }
 }
-
-
-
 
 // Serve processed files
 app.use("/processed-videos", express.static("processed"));
