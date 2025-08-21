@@ -1,25 +1,18 @@
 FROM node:18-slim
 
-# Install only essential dependencies - avoid Python complications
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    curl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
-# Copy package files first (better layer caching)
-COPY package*.json ./
-
-# Install Node.js dependencies
-RUN npm ci --production
-
-# Copy source code
+# Copy everything
 COPY . ./
+
+# Make build script executable and run it
+RUN chmod +x ./build.sh && ./build.sh
 
 # Create required directories
 RUN mkdir -p temp uploads processed models
+
+# Pre-download Whisper model
+RUN npx nodejs-whisper download tiny
 
 # Expose port
 EXPOSE 5000
