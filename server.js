@@ -170,9 +170,33 @@ app.post(
         try {
           const audioTranscription =
             await moderationService.extractAndTranscribeAudio(req.file.path);
-          if (audioTranscription && audioTranscription.length > 0) {
-            audioResult =
-              moderationService.moderateTextContent(audioTranscription);
+          // ✅ SAFE: Add proper validation
+          if (
+            audioTranscription &&
+            Array.isArray(audioTranscription) &&
+            audioTranscription.length > 0
+          ) {
+            // Validate that each subtitle has required properties
+            const validSubtitles = audioTranscription.filter(
+              (subtitle) =>
+                subtitle &&
+                typeof subtitle === "object" &&
+                subtitle.text &&
+                subtitle.text.trim().length > 0
+            );
+
+            if (validSubtitles.length > 0) {
+              audioResult =
+                moderationService.moderateTextContent(validSubtitles);
+            } else {
+              console.log(
+                "[SAFETY-CHECK] No valid subtitles found for audio moderation"
+              );
+            }
+          } else {
+            console.log(
+              "[SAFETY-CHECK] Audio transcription returned no results"
+            );
           }
         } catch (audioError) {
           console.warn(

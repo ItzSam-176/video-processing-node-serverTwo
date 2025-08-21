@@ -216,6 +216,14 @@ class ModerationService {
 
   moderateTextContent(subtitles) {
     try {
+      if (!subtitles || !Array.isArray(subtitles) || subtitles.length === 0) {
+        console.log("[MODERATION] No subtitles to moderate");
+        return {
+          flagged: false,
+          flaggedSubtitles: [],
+          totalSubtitlesChecked: 0,
+        };
+      }
       const flaggedSubtitles = [];
 
       for (const subtitle of subtitles) {
