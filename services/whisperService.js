@@ -1,5 +1,6 @@
 const { nodewhisper } = require("nodejs-whisper");
 const ffmpeg = require("fluent-ffmpeg");
+const os = require("os");
 const path = require("path");
 const fs = require("fs-extra");
 const { v4: uuidv4 } = require("uuid");
