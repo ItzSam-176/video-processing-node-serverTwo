@@ -26,16 +26,10 @@ class ModerationService {
   constructor() {
     this.nsfwModel = null;
     this.initialized = false;
-    // Point to a larger hosted model; choose one and deploy its files
-    this.modelUrl =
-      process.env.NSFW_MODEL_URL || // e.g., "https://cdn.example.com/nsfw/mobilenet_v2_mid/"
-      "file:///app/nsfw-models/mobilenet_v2_mid/"; // local path in container
-    // If using a graph model, set type: 'graph' with size when needed
-    this.modelOptions = {
-      /* type: 'graph', size: 299 */
-    }; // e.g., for InceptionV3 set { size: 299 }
+    // Choose a heavier built-in by name; defaults to "MobileNetV2"
+    this.modelName = process.env.NSFW_MODEL_NAME || "MobileNetV2Mid";
+    this.modelOptions = {}; // e.g., for Inception: { size: 299, type: 'graph' }
   }
-
   // async initialize() {
   //   try {
   //     console.log("[MODERATION] Initializing NSFW model...");
@@ -49,11 +43,10 @@ class ModerationService {
   // }
   async initialize() {
     try {
-      console.log("[MODERATION] Initializing NSFW model (larger variant)...");
-      // load() accepts a URL or file:// path; avoid bundling base64 to save memory
-      this.nsfwModel = await nsfw.load(this.modelUrl, this.modelOptions);
+      console.log(`[MODERATION] Loading NSFW model variant: ${this.modelName}`);
+      this.nsfwModel = await nsfw.load(this.modelName, this.modelOptions);
       this.initialized = true;
-      console.log("[MODERATION] ✅ Larger NSFW model loaded");
+      console.log("[MODERATION] ✅ NSFW model variant loaded");
     } catch (error) {
       console.error("[MODERATION] ❌ Failed to initialize NSFW model:", error);
       throw error;
