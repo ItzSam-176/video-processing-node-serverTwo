@@ -3,7 +3,6 @@
 # ========================
 FROM debian:bullseye AS builder
 
-# Install build deps
 RUN apt-get update && apt-get install -y \
   git \
   cmake \
@@ -11,18 +10,19 @@ RUN apt-get update && apt-get install -y \
   python3 \
   && rm -rf /var/lib/apt/lists/*
 
-# Build whisper.cpp
 WORKDIR /opt
-RUN git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git \
-  && cd whisper.cpp \
-  && make -j
+RUN git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git
+
+WORKDIR /opt/whisper.cpp
+# Force static linking
+RUN make clean && \
+    make -j GGML_STATIC=1
 
 # ========================
 # 2. Runtime stage
 # ========================
 FROM node:20-bullseye AS runtime
 
-# Install runtime deps only (lighter than full build deps)
 RUN apt-get update && apt-get install -y \
   ffmpeg \
   python3 \
@@ -31,27 +31,16 @@ RUN apt-get update && apt-get install -y \
   wget \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy whisper-cli from builder
+# Copy static whisper-cli only (no libs needed)
 COPY --from=builder /opt/whisper.cpp/build/bin/whisper-cli /usr/local/bin/
-RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/whisper.conf \
-    && ldconfig \
-    && ln -sf /usr/local/lib/libwhisper.so /usr/local/lib/libwhisper.so.1
-RUN ls -la /usr/local/lib | grep whisper && ldd /usr/local/bin/whisper-cli
 
-RUN ldconfig
-
-# App setup
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Pre-download the tiny model (cached separately from app source)
 RUN npx nodejs-whisper download tiny
 
-# Copy app source
 COPY . ./
-
-# Create dirs
 RUN mkdir -p temp uploads processed models
 
 ENV NODE_ENV=production
