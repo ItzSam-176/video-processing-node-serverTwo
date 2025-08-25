@@ -3,6 +3,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const fs = require("fs-extra");
 const { v4: uuidv4 } = require("uuid");
+const { spawnSync } = require("node:child_process");
 
 class WhisperService {
   constructor() {
@@ -32,6 +33,36 @@ class WhisperService {
     if (this._initPromise) return this._initPromise;
 
     this._initPromise = (async () => {
+      const whichWhisper = spawnSync("which", ["whisper-cli"], {
+        encoding: "utf8",
+      });
+      const whisperPath =
+        whichWhisper.status === 0 ? whichWhisper.stdout.trim() : null;
+
+      if (whisperPath) {
+        console.log("[WHISPER] whisper-cli path:", whisperPath);
+      } else {
+        console.warn(
+          "[WHISPER] whisper-cli not found in PATH:",
+          whichWhisper.stderr || whichWhisper.stdout
+        );
+      }
+
+      // Try `whisper-cli -h` to confirm executable works
+      const help = spawnSync(whisperPath || "whisper-cli", ["-h"], {
+        encoding: "utf8",
+      });
+      if (help.status !== 0) {
+        const msg = help.error
+          ? help.error.message
+          : help.stderr || help.stdout || "unknown error";
+        console.warn("[WHISPER] whisper-cli -h failed:", msg);
+        // Fail fast so deploy logs clearly state what's wrong
+        throw new Error(
+          "whisper-cli executable not found or not runnable. Ensure it is installed and in PATH."
+        );
+      }
+
       const warmupWav = path.join(
         __dirname,
         "../temp",
