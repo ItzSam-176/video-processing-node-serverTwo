@@ -26,6 +26,9 @@ const createDirectories = async () => {
 };
 createDirectories();
 
+let nsfwReady = false;
+let whisperReady = false;
+
 // Health check
 app.get("/", (req, res) =>
   res.json({ status: "Video Processor API is running!" })
@@ -33,6 +36,27 @@ app.get("/", (req, res) =>
 app.get("/health", (req, res) =>
   res.json({ status: "OK", timestamp: new Date() })
 );
+app.get("/readiness", (req, res) =>
+  res.json({ nsfwReady, whisperReady, ready: nsfwReady && whisperReady })
+);
+
+(async () => {
+  try {
+    await moderationService.initialize();
+    nsfwReady = true;
+  } catch (e) {
+    console.error("[BOOT] NSFW preload failed:", e);
+  }
+})();
+
+(async () => {
+  try {
+    await whisperService.initialize();
+    whisperReady = true;
+  } catch (e) {
+    console.error("[BOOT] Whisper preload failed:", e);
+  }
+})();
 
 // Routes
 app.post(

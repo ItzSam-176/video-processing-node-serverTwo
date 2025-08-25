@@ -8,17 +8,68 @@ class WhisperService {
   constructor() {
     this.modelName = "tiny";
     this.initialized = false;
+    this._initPromise = null;
+  }
+  async _makeSilentWav(filePath) {
+    await fs.ensureDir(path.dirname(filePath));
+    return new Promise((resolve, reject) => {
+      // Generate 1-second silent mono 16kHz PCM WAV using lavfi anullsrc
+      ffmpeg()
+        .input("anullsrc=r=16000:cl=mono")
+        .inputOptions(["-f", "lavfi"])
+        .audioCodec("pcm_s16le")
+        .audioChannels(1)
+        .audioFrequency(16000)
+        .duration(1)
+        .output(filePath)
+        .on("end", resolve)
+        .on("error", reject)
+        .run();
+    });
   }
   async initialize() {
     if (this.initialized) return;
+    if (this._initPromise) return this._initPromise;
 
-    try {
-      console.log("[WHISPER] Initializing and downloading model...");
-      this.initialized = true;
-    } catch (error) {
-      console.error("[WHISPER] Initialization failed:", error);
-      throw error;
-    }
+    this._initPromise = (async () => {
+      const warmupWav = path.join(
+        __dirname,
+        "../temp",
+        `warmup_${uuidv4()}.wav`
+      );
+      try {
+        console.log(
+          "[WHISPER] Warming up model (may download on first run)..."
+        );
+        await this._makeSilentWav(warmupWav);
+        // Trigger model download/init
+        await nodewhisper(warmupWav, {
+          modelName: this.modelName,
+          autoDownloadModelName: this.modelName,
+          // keep options minimal for warmup
+          whisperOptions: {
+            outputInSrt: false,
+            outputInText: false,
+            outputInVtt: false,
+            outputInJson: false,
+            outputInCsv: false,
+            outputInWords: false,
+            translateToEnglish: false,
+            wordTimestamps: false,
+            splitOnWord: true,
+          },
+        });
+        this.initialized = true;
+        console.log("[WHISPER] ✅ Model warmed up");
+      } catch (err) {
+        console.error("[WHISPER] Warmup failed:", err);
+        throw err;
+      } finally {
+        await fs.remove(warmupWav).catch(() => {});
+      }
+    })();
+
+    return this._initPromise;
   }
 
   async extractAudio(videoPath, trimStart = 0, trimEnd = null) {
@@ -191,20 +242,25 @@ class WhisperService {
         modelName: this.modelName,
         autoDownloadModelName: this.modelName,
         whisperOptions: {
+          // null for auto language detection per nodejs-whisper
           language: params.language === "auto" ? null : params.language,
-          task: params.translateToEnglish ? "translate" : "transcribe",
-          gen_file_txt: false,
-          gen_file_subtitle: false,
-          gen_file_vtt: false,
-          word_timestamps: true,
-          timestamp_size: 23,
-          max_len: 30,
-          split_on_word: true,
-          no_speech_threshold: 0.6,
-          condition_on_previous_text: false,
-          compression_ratio_threshold: 2.4,
+          translateToEnglish: !!params.translateToEnglish,
+          // disable all file outputs; we parse stdout
+          outputInCsv: false,
+          outputInJson: false,
+          outputInJsonFull: false,
+          outputInLrc: false,
+          outputInSrt: false,
+          outputInText: false,
+          outputInVtt: false,
+          outputInWords: false,
+          // timestamps settings supported by wrapper
+          wordTimestamps: true,
+          timestamps_length: 23,
+          splitOnWord: true,
         },
       });
+
 
       console.log("[WHISPER] Whisper result type:", typeof result);
 
