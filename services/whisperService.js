@@ -15,7 +15,6 @@ class WhisperService {
     try {
       console.log("[WHISPER] Initializing and downloading model...");
       // Download model at runtime if not exists
-      await this.ensureModelExists();
       this.initialized = true;
     } catch (error) {
       console.error("[WHISPER] Initialization failed:", error);
