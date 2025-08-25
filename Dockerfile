@@ -36,6 +36,8 @@ COPY --from=builder /opt/whisper.cpp/build/bin/whisper-cli /usr/local/bin/
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/whisper.conf \
     && ldconfig \
     && ln -sf /usr/local/lib/libwhisper.so /usr/local/lib/libwhisper.so.1
+RUN ls -la /usr/local/lib | grep whisper && ldd /usr/local/bin/whisper-cli
+
 RUN ldconfig
 
 # App setup
