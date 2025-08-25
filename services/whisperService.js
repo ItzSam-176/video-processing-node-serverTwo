@@ -1,4 +1,4 @@
-const {nodewhisper} = require("nodejs-whisper");
+const { nodewhisper } = require("nodejs-whisper");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const fs = require("fs-extra");
@@ -9,12 +9,87 @@ class WhisperService {
     this.modelName = "tiny";
     this.initialized = false;
   }
+
+  async ensureModelExists() {
+    try {
+      // Known model file names are ggml-<model>.bin for whisper.cpp backends
+      // nodejs-whisper keeps models under a cache dir; different versions may
+      // use different structures. We check a few common locations.
+      const candidates = [
+        // direct file under cache root
+        path.join(this.modelCacheRoot, `ggml-${this.modelName}.bin`),
+        // nested model dir
+        path.join(
+          this.modelCacheRoot,
+          this.modelName,
+          `ggml-${this.modelName}.bin`
+        ),
+        // generic ggml bin under cache
+        path.join(this.modelCacheRoot, `${this.modelName}.bin`),
+      ];
+
+      // If any candidate exists and is a file with reasonable size, assume installed
+      for (const p of candidates) {
+        if (await fs.pathExists(p)) {
+          const stat = await fs.stat(p).catch(() => null);
+          if (stat && stat.isFile() && stat.size > 10 * 1024 * 1024) {
+            console.log(`[WHISPER] Model "${this.modelName}" found at: ${p}`);
+            return;
+          }
+        }
+      }
+
+      // Not found; run the official downloader provided by nodejs-whisper
+      await fs.ensureDir(this.modelCacheRoot);
+      console.log(
+        `[WHISPER] Model "${this.modelName}" not found. Downloading into: ${this.modelCacheRoot} ...`
+      );
+
+      // Use npx nodejs-whisper download <model>, and force cache root via env if supported
+      const env = {
+        ...process.env,
+        WHISPER_CACHE: this.modelCacheRoot,
+      };
+
+      const dl = spawnSync(
+        process.platform === "win32" ? "npx.cmd" : "npx",
+        ["nodejs-whisper", "download", this.modelName],
+        { encoding: "utf8", stdio: "inherit", env }
+      );
+
+      if (dl.status !== 0) {
+        throw new Error(
+          `Failed to download model "${this.modelName}" (exit ${dl.status}).`
+        );
+      }
+
+      // Post-check again
+      for (const p of candidates) {
+        if (await fs.pathExists(p)) {
+          const stat = await fs.stat(p).catch(() => null);
+          if (stat && stat.isFile() && stat.size > 10 * 1024 * 1024) {
+            console.log(`[WHISPER] ✅ Model downloaded: ${p}`);
+            return;
+          }
+        }
+      }
+
+      console.warn(
+        `[WHISPER] Model "${this.modelName}" download finished but file not found in expected locations.`
+      );
+    } catch (err) {
+      console.error("[WHISPER] ensureModelExists error:", err);
+      throw err;
+    }
+  }
+
   async initialize() {
     if (this.initialized) return;
 
     try {
       console.log("[WHISPER] Initializing and downloading model...");
       // Download model at runtime if not exists
+      await this.ensureModelExists();
       this.initialized = true;
     } catch (error) {
       console.error("[WHISPER] Initialization failed:", error);
@@ -206,7 +281,6 @@ class WhisperService {
           compression_ratio_threshold: 2.4,
         },
       });
-
 
       console.log("[WHISPER] Whisper result type:", typeof result);
 
