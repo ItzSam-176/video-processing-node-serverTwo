@@ -1,30 +1,48 @@
-FROM node:20-bullseye
+# ========================
+# 1. Builder stage
+# ========================
+FROM debian:bullseye AS builder
 
-# Install build deps and ffmpeg
+# Install build deps
 RUN apt-get update && apt-get install -y \
   git \
   cmake \
   build-essential \
   python3 \
+  && rm -rf /var/lib/apt/lists/*
+
+# Build whisper.cpp
+WORKDIR /opt
+RUN git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git \
+  && cd whisper.cpp \
+  && make -j
+
+# ========================
+# 2. Runtime stage
+# ========================
+FROM node:20-bullseye AS runtime
+
+# Install runtime deps only (lighter than full build deps)
+RUN apt-get update && apt-get install -y \
   ffmpeg \
+  python3 \
   ca-certificates \
   curl \
   wget \
   && rm -rf /var/lib/apt/lists/*
 
-# Build whisper.cpp and install whisper-cli
-WORKDIR /opt
-RUN git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git \
-  && cd whisper.cpp \
-  && make -j \
-  && cp main /usr/local/bin/whisper-cli \
-  && rm -rf /opt/whisper.cpp
+# Copy whisper-cli from builder
+COPY --from=builder /opt/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
-# Setup app
+# App setup
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
+
+# Pre-download the tiny model (cached separately from app source)
 RUN npx nodejs-whisper download tiny
+
+# Copy app source
 COPY . ./
 
 # Create dirs
