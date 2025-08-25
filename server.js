@@ -418,6 +418,25 @@ function formatDuration(seconds) {
 // Serve processed files
 app.use("/processed-videos", express.static("processed"));
 
-app.listen(PORT, "0.0.0.0", () => {
+// app.listen(PORT, "0.0.0.0", () => {
+//   console.log(`🚀 Video Processor Server running on port ${PORT}`);
+// });
+// server.js (add this near the bottom, replacing app.listen with http server setup)
+const http = require("http");
+
+// Create HTTP server explicitly so we can set timeouts
+const server = http.createServer(app);
+
+// Tune Node/Express timeouts (values in milliseconds)
+server.requestTimeout = 180000;      // how long to wait for the entire request/response cycle (3 min) [web:225]
+server.headersTimeout = 180000;      // how long to wait for incoming headers (3 min) [web:225]
+server.keepAliveTimeout = 90000;     // idle keep-alive timeout (1.5 min) [web:225]
+
+// Optional: increase socket timeout too (older Node behavior)
+server.timeout = 0; // 0 = no automatic timeout; rely on requestTimeout above [web:225]
+
+// Start server
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Video Processor Server running on port ${PORT}`);
 });
+
