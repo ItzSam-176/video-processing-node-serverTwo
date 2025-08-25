@@ -3,104 +3,24 @@ const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const fs = require("fs-extra");
 const { v4: uuidv4 } = require("uuid");
-const { spawnSync } = require("node:child_process");
 
 class WhisperService {
   constructor() {
     this.modelName = "tiny";
     this.initialized = false;
-    this._initPromise = null;
-  }
-  async _makeSilentWav(filePath) {
-    await fs.ensureDir(path.dirname(filePath));
-    return new Promise((resolve, reject) => {
-      // Generate 1-second silent mono 16kHz PCM WAV using lavfi anullsrc
-      ffmpeg()
-        .input("anullsrc=r=16000:cl=mono")
-        .inputOptions(["-f", "lavfi"])
-        .audioCodec("pcm_s16le")
-        .audioChannels(1)
-        .audioFrequency(16000)
-        .duration(1)
-        .output(filePath)
-        .on("end", resolve)
-        .on("error", reject)
-        .run();
-    });
   }
   async initialize() {
     if (this.initialized) return;
-    if (this._initPromise) return this._initPromise;
 
-    this._initPromise = (async () => {
-      const whichWhisper = spawnSync("which", ["whisper-cli"], {
-        encoding: "utf8",
-      });
-      const whisperPath =
-        whichWhisper.status === 0 ? whichWhisper.stdout.trim() : null;
-
-      if (whisperPath) {
-        console.log("[WHISPER] whisper-cli path:", whisperPath);
-      } else {
-        console.warn(
-          "[WHISPER] whisper-cli not found in PATH:",
-          whichWhisper.stderr || whichWhisper.stdout
-        );
-      }
-
-      // Try `whisper-cli -h` to confirm executable works
-      const help = spawnSync(whisperPath || "whisper-cli", ["-h"], {
-        encoding: "utf8",
-      });
-      if (help.status !== 0) {
-        const msg = help.error
-          ? help.error.message
-          : help.stderr || help.stdout || "unknown error";
-        console.warn("[WHISPER] whisper-cli -h failed:", msg);
-        // Fail fast so deploy logs clearly state what's wrong
-        throw new Error(
-          "whisper-cli executable not found or not runnable. Ensure it is installed and in PATH."
-        );
-      }
-
-      const warmupWav = path.join(
-        __dirname,
-        "../temp",
-        `warmup_${uuidv4()}.wav`
-      );
-      try {
-        console.log(
-          "[WHISPER] Warming up model (may download on first run)..."
-        );
-        await this._makeSilentWav(warmupWav);
-        // Trigger model download/init
-        await nodewhisper(warmupWav, {
-          modelName: this.modelName,
-          autoDownloadModelName: this.modelName,
-          // keep options minimal for warmup
-          whisperOptions: {
-            outputInSrt: false,
-            outputInText: false,
-            outputInVtt: false,
-            outputInJson: false,
-            outputInCsv: false,
-            outputInWords: false,
-            translateToEnglish: false,
-            wordTimestamps: false,
-            splitOnWord: true,
-          },
-        });
-        this.initialized = true;
-        console.log("[WHISPER] ✅ Model warmed up");
-      } catch (err) {
-        console.error("[WHISPER] Warmup failed:", err);
-        throw err;
-      } finally {
-        await fs.remove(warmupWav).catch(() => {});
-      }
-    })();
-
-    return this._initPromise;
+    try {
+      console.log("[WHISPER] Initializing and downloading model...");
+      // Download model at runtime if not exists
+      await this.ensureModelExists();
+      this.initialized = true;
+    } catch (error) {
+      console.error("[WHISPER] Initialization failed:", error);
+      throw error;
+    }
   }
 
   async extractAudio(videoPath, trimStart = 0, trimEnd = null) {
@@ -273,22 +193,18 @@ class WhisperService {
         modelName: this.modelName,
         autoDownloadModelName: this.modelName,
         whisperOptions: {
-          // null for auto language detection per nodejs-whisper
           language: params.language === "auto" ? null : params.language,
-          translateToEnglish: !!params.translateToEnglish,
-          // disable all file outputs; we parse stdout
-          outputInCsv: false,
-          outputInJson: false,
-          outputInJsonFull: false,
-          outputInLrc: false,
-          outputInSrt: false,
-          outputInText: false,
-          outputInVtt: false,
-          outputInWords: false,
-          // timestamps settings supported by wrapper
-          wordTimestamps: true,
-          timestamps_length: 23,
-          splitOnWord: true,
+          task: params.translateToEnglish ? "translate" : "transcribe",
+          gen_file_txt: false,
+          gen_file_subtitle: false,
+          gen_file_vtt: false,
+          word_timestamps: true,
+          timestamp_size: 23,
+          max_len: 30,
+          split_on_word: true,
+          no_speech_threshold: 0.6,
+          condition_on_previous_text: false,
+          compression_ratio_threshold: 2.4,
         },
       });
 
