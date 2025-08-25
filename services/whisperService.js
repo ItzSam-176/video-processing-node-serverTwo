@@ -3,32 +3,55 @@ const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const fs = require("fs-extra");
 const { v4: uuidv4 } = require("uuid");
+const { spawnSync } = require("node:child_process");
 
 class WhisperService {
   constructor() {
     this.modelName = "tiny";
     this.initialized = false;
+
+    const home =
+      os.homedir && typeof os.homedir === "function" ? os.homedir() : null;
+    const fallbackBase =
+      process.env.WHISPER_CACHE ||
+      process.env.WHISPER_CACHE_DIR ||
+      process.env.HOME ||
+      process.env.USERPROFILE ||
+      "/app/models"; // final fallback inside container
+
+    const base =
+      home && typeof home === "string" && home.length > 0 ? home : fallbackBase;
+
+    // If base is still falsy, last-resort to /tmp
+    this.modelCacheRoot = base
+      ? path.join(base, ".cache", "whisper-node")
+      : path.join("/tmp", "whisper-node");
+
+    // Normalize to avoid surprises
+    this.modelCacheRoot = path.resolve(this.modelCacheRoot);
   }
 
   async ensureModelExists() {
     try {
-      // Known model file names are ggml-<model>.bin for whisper.cpp backends
-      // nodejs-whisper keeps models under a cache dir; different versions may
-      // use different structures. We check a few common locations.
+      // Guards: ensure modelCacheRoot is a string and directory exists
+      if (!this.modelCacheRoot || typeof this.modelCacheRoot !== "string") {
+        throw new Error(
+          "Invalid modelCacheRoot; cannot determine cache directory."
+        );
+      }
+
+      await fs.ensureDir(this.modelCacheRoot);
+
       const candidates = [
-        // direct file under cache root
         path.join(this.modelCacheRoot, `ggml-${this.modelName}.bin`),
-        // nested model dir
         path.join(
           this.modelCacheRoot,
           this.modelName,
           `ggml-${this.modelName}.bin`
         ),
-        // generic ggml bin under cache
         path.join(this.modelCacheRoot, `${this.modelName}.bin`),
       ];
 
-      // If any candidate exists and is a file with reasonable size, assume installed
       for (const p of candidates) {
         if (await fs.pathExists(p)) {
           const stat = await fs.stat(p).catch(() => null);
@@ -39,22 +62,25 @@ class WhisperService {
         }
       }
 
-      // Not found; run the official downloader provided by nodejs-whisper
-      await fs.ensureDir(this.modelCacheRoot);
       console.log(
         `[WHISPER] Model "${this.modelName}" not found. Downloading into: ${this.modelCacheRoot} ...`
       );
 
-      // Use npx nodejs-whisper download <model>, and force cache root via env if supported
       const env = {
         ...process.env,
         WHISPER_CACHE: this.modelCacheRoot,
+        WHISPER_CACHE_DIR: this.modelCacheRoot,
       };
 
+      const npxCmd = process.platform === "win32" ? "npx.cmd" : "npx";
       const dl = spawnSync(
-        process.platform === "win32" ? "npx.cmd" : "npx",
+        npxCmd,
         ["nodejs-whisper", "download", this.modelName],
-        { encoding: "utf8", stdio: "inherit", env }
+        {
+          encoding: "utf8",
+          stdio: "inherit",
+          env,
+        }
       );
 
       if (dl.status !== 0) {
@@ -63,7 +89,7 @@ class WhisperService {
         );
       }
 
-      // Post-check again
+      // Post-check
       for (const p of candidates) {
         if (await fs.pathExists(p)) {
           const stat = await fs.stat(p).catch(() => null);
@@ -75,7 +101,7 @@ class WhisperService {
       }
 
       console.warn(
-        `[WHISPER] Model "${this.modelName}" download finished but file not found in expected locations.`
+        `[WHISPER] Model "${this.modelName}" downloaded but not found in expected locations.`
       );
     } catch (err) {
       console.error("[WHISPER] ensureModelExists error:", err);
