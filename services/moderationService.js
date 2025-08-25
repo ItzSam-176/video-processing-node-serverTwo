@@ -14,24 +14,48 @@ const fs = require("fs-extra");
 const whisperService = require("./whisperService");
 const config = require("../config/moderation");
 class ModerationService {
+  // constructor() {
+  //   this.nsfwModel = null;
+  //   this.matcher = new RegExpMatcher({
+  //     ...englishDataset.build(),
+  //     ...englishRecommendedTransformers,
+  //   });
+  //   this.censor = new TextCensor();
+  //   this.initialized = false;
+  // }
   constructor() {
     this.nsfwModel = null;
-    this.matcher = new RegExpMatcher({
-      ...englishDataset.build(),
-      ...englishRecommendedTransformers,
-    });
-    this.censor = new TextCensor();
     this.initialized = false;
+    // Point to a larger hosted model; choose one and deploy its files
+    this.modelUrl =
+      process.env.NSFW_MODEL_URL || // e.g., "https://cdn.example.com/nsfw/mobilenet_v2_mid/"
+      "file:///app/nsfw-models/mobilenet_v2_mid/"; // local path in container
+    // If using a graph model, set type: 'graph' with size when needed
+    this.modelOptions = {
+      /* type: 'graph', size: 299 */
+    }; // e.g., for InceptionV3 set { size: 299 }
   }
 
+  // async initialize() {
+  //   try {
+  //     console.log("[MODERATION] Initializing NSFW model...");
+  //     this.nsfwModel = await nsfw.load();
+  //     this.initialized = true;
+  //     console.log("[MODERATION] ✅ Model initialized successfully");
+  //   } catch (error) {
+  //     console.error("[MODERATION] ❌ Failed to initialize:", error);
+  //     throw error;
+  //   }
+  // }
   async initialize() {
     try {
-      console.log("[MODERATION] Initializing NSFW model...");
-      this.nsfwModel = await nsfw.load();
+      console.log("[MODERATION] Initializing NSFW model (larger variant)...");
+      // load() accepts a URL or file:// path; avoid bundling base64 to save memory
+      this.nsfwModel = await nsfw.load(this.modelUrl, this.modelOptions);
       this.initialized = true;
-      console.log("[MODERATION] ✅ Model initialized successfully");
+      console.log("[MODERATION] ✅ Larger NSFW model loaded");
     } catch (error) {
-      console.error("[MODERATION] ❌ Failed to initialize:", error);
+      console.error("[MODERATION] ❌ Failed to initialize NSFW model:", error);
       throw error;
     }
   }
