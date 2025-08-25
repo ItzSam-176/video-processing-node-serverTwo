@@ -22,37 +22,18 @@ class ModerationService {
     });
     this.censor = new TextCensor();
     this.initialized = false;
-    this._initPromise = null;
-  }
-  async warmup() {
-    if (!this.nsfwModel) return;
-    // NSFWJS MobileNetV2 expects 224x224x3
-    const img = tf.zeros([224, 224, 3], "int32");
-    try {
-      await this.nsfwModel.classify(img);
-    } finally {
-      img.dispose();
-    }
   }
 
   async initialize() {
-    if (this.initialized) return;
-    if (this._initPromise) return this._initPromise;
-
-    this._initPromise = (async () => {
-      try {
-        console.log("[MODERATION] Initializing NSFW model...");
-        this.nsfwModel = await nsfw.load(); // or nsfw.load('file://path/to/model/') if hosting locally
-        await this.warmup();
-        this.initialized = true;
-        console.log("[MODERATION] ✅ Model initialized and warmed up");
-      } catch (error) {
-        console.error("[MODERATION] ❌ Failed to initialize:", error);
-        throw error;
-      }
-    })();
-
-    return this._initPromise;
+    try {
+      console.log("[MODERATION] Initializing NSFW model...");
+      this.nsfwModel = await nsfw.load();
+      this.initialized = true;
+      console.log("[MODERATION] ✅ Model initialized successfully");
+    } catch (error) {
+      console.error("[MODERATION] ❌ Failed to initialize:", error);
+      throw error;
+    }
   }
 
   async extractFrames(videoPath) {

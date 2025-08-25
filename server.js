@@ -16,7 +16,6 @@ const multer = require("multer");
 const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
-const { spawnSync, execSync } = require("node:child_process");
 
 // Create directories on startup
 const createDirectories = async () => {
@@ -27,54 +26,6 @@ const createDirectories = async () => {
 };
 createDirectories();
 
-(() => {
-  try {
-    console.log("[BOOT] PATH =", process.env.PATH); // verify PATH visible to app [2]
-
-    // Try to locate whisper-cli and ffmpeg using `which`
-    const whichWhisper = spawnSync("which", ["whisper-cli"], {
-      encoding: "utf8",
-    });
-    const whichFfmpeg = spawnSync("which", ["ffmpeg"], { encoding: "utf8" });
-
-    if (whichWhisper.status === 0) {
-      console.log("[BOOT] which whisper-cli =", whichWhisper.stdout.trim()); // absolute path expected [3]
-    } else {
-      console.warn(
-        "[BOOT] which whisper-cli not found:",
-        whichWhisper.stderr || whichWhisper.stdout
-      );
-    }
-
-    if (whichFfmpeg.status === 0) {
-      console.log("[BOOT] which ffmpeg =", whichFfmpeg.stdout.trim()); // absolute path expected [3]
-    } else {
-      console.warn(
-        "[BOOT] which ffmpeg not found:",
-        whichFfmpeg.stderr || whichFfmpeg.stdout
-      );
-    }
-
-    // Print ffmpeg -version if available
-    // Print ffmpeg -version if available
-    const ffmpegVer = spawnSync("ffmpeg", ["-version"], { encoding: "utf8" });
-    if (ffmpegVer.status === 0) {
-      const firstLine = String(ffmpegVer.stdout || "").split("\n")[0] || "";
-      console.log("[BOOT] ffmpeg -version (first line):", firstLine);
-    } else {
-      console.warn(
-        "[BOOT] ffmpeg -version error:",
-        ffmpegVer.stderr || ffmpegVer.stdout
-      );
-    }
-  } catch (e) {
-    console.error("[BOOT] Binary checks failed:", e);
-  }
-})();
-
-let nsfwReady = false;
-let whisperReady = false;
-
 // Health check
 app.get("/", (req, res) =>
   res.json({ status: "Video Processor API is running!" })
@@ -82,27 +33,6 @@ app.get("/", (req, res) =>
 app.get("/health", (req, res) =>
   res.json({ status: "OK", timestamp: new Date() })
 );
-app.get("/readiness", (req, res) =>
-  res.json({ nsfwReady, whisperReady, ready: nsfwReady && whisperReady })
-);
-
-(async () => {
-  try {
-    await moderationService.initialize();
-    nsfwReady = true;
-  } catch (e) {
-    console.error("[BOOT] NSFW preload failed:", e);
-  }
-})();
-
-(async () => {
-  try {
-    await whisperService.initialize();
-    whisperReady = true;
-  } catch (e) {
-    console.error("[BOOT] Whisper preload failed:", e);
-  }
-})();
 
 // Routes
 app.post(
