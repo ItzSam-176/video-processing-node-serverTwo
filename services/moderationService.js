@@ -45,6 +45,11 @@ class ModerationService {
     try {
       console.log(`[MODERATION] Loading NSFW model variant: ${this.modelName}`);
       this.nsfwModel = await nsfw.load(this.modelName, this.modelOptions);
+      this.matcher = new RegExpMatcher({
+        ...englishDataset.build(),
+        ...englishRecommendedTransformers,
+      });
+      this.censor = new TextCensor();
       this.initialized = true;
       console.log("[MODERATION] ✅ NSFW model variant loaded");
     } catch (error) {
