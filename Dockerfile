@@ -32,7 +32,10 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy whisper-cli from builder
-COPY --from=builder /opt/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
+COPY --from=builder /opt/whisper.cpp/build/bin/whisper-cli /usr/local/bin/
+COPY --from=builder /opt/whisper.cpp/build/* /usr/local/lib/ || true
+RUN ldconfig
+
 
 # App setup
 WORKDIR /app
