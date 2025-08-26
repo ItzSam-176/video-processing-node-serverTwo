@@ -30,6 +30,7 @@ class ModerationService {
     this.modelName = process.env.NSFW_MODEL_NAME || "MobileNetV2Mid";
     this.modelOptions = {}; // e.g., for Inception: { size: 299, type: 'graph' }
   }
+  //Working wiht base modal but not the best
   // async initialize() {
   //   try {
   //     console.log("[MODERATION] Initializing NSFW model...");
@@ -41,21 +42,53 @@ class ModerationService {
   //     throw error;
   //   }
   // }
+  //Getting 502 errors with this model
+  // async initialize() {
+  //   try {
+  //     console.log(`[MODERATION] Loading NSFW model variant: ${this.modelName}`);
+  //     this.nsfwModel = await nsfw.load(this.modelName, this.modelOptions);
+  //     this.matcher = new RegExpMatcher({
+  //       ...englishDataset.build(),
+  //       ...englishRecommendedTransformers,
+  //     });
+  //     this.censor = new TextCensor();
+  //     this.initialized = true;
+  //     console.log("[MODERATION] ✅ NSFW model variant loaded");
+  //   } catch (error) {
+  //     console.error("[MODERATION] ❌ Failed to initialize NSFW model:", error);
+  //     throw error;
+  //   }
+  // }
   async initialize() {
-    try {
-      console.log(`[MODERATION] Loading NSFW model variant: ${this.modelName}`);
-      this.nsfwModel = await nsfw.load(this.modelName, this.modelOptions);
-      this.matcher = new RegExpMatcher({
-        ...englishDataset.build(),
-        ...englishRecommendedTransformers,
-      });
-      this.censor = new TextCensor();
-      this.initialized = true;
-      console.log("[MODERATION] ✅ NSFW model variant loaded");
-    } catch (error) {
-      console.error("[MODERATION] ❌ Failed to initialize NSFW model:", error);
-      throw error;
+    if (this.initialized) return;
+    console.log("[MODERATION] Initializing NSFW model...");
+    const modelName = process.env.NSFW_MODEL_NAME || "MobileNetV2Mid";
+    if (modelName === "MobileNetV2Mid" && process.env.NSFW_MODEL_DIR) {
+      const dir = process.env.NSFW_MODEL_DIR.startsWith("file://")
+        ? process.env.NSFW_MODEL_DIR
+        : "file://" +
+          process.env.NSFW_MODEL_DIR.replace(/\\/g, "/") +
+          (process.env.NSFW_MODEL_DIR.endsWith("/") ? "" : "/");
+      this.nsfwModel = await nsfw.load(dir, { type: "graph" });
+    } else if (modelName === "MobileNetV2" || modelName === "InceptionV3") {
+      this.nsfwModel = await nsfw.load(modelName); // bundled
+    } else {
+      // default to local path if provided, else bundled MobileNetV2
+      const localDir =
+        "file://" +
+        path.join(
+          __dirname,
+          "..",
+          "models",
+          "nsfw",
+          "mobilenet_v2_mid",
+          "web_model"
+        ) +
+        path.sep;
+      this.nsfwModel = await nsfw.load(localDir, { type: "graph" });
     }
+    this.initialized = true;
+    console.log("[MODERATION] ✅ Model initialized successfully");
   }
 
   async extractFrames(videoPath) {
