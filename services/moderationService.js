@@ -60,7 +60,7 @@ class ModerationService {
   //     throw error;
   //   }
   // }
-  async initialize() {
+async initialize() {
     if (this.initialized) return;
     if (this.loadingPromise) {
       await this.loadingPromise;
@@ -68,32 +68,29 @@ class ModerationService {
     }
 
     this.loadingPromise = (async () => {
-      console.log(
-        "[MODERATION] Initializing NSFW model (MobileNetV2Mid graph)..."
-      );
+      console.log('[MODERATION] Initializing NSFW model (MobileNetV2Mid graph)...');
 
-      // New folder layout:
-      // <project-root>/models/model/mobilenet_v2_mid/{model.json, group1-shard*.bin}
-      const envDir = process.env.NSFW_MODEL_DIR; // optional absolute path override
+      // Folder layout (from your screenshot):
+      // <project-root>/models/mobilenet_v2_mid/{model.json, group1-shard1of2.bin, group1-shard2of2.bin}
+      // __dirname here is /app/services, so go up one level to /app, then into /models/...
+      const envDir = process.env.NSFW_MODEL_DIR; // optional absolute override
       const modelDir = envDir
         ? envDir
-        : path.join(__dirname,"models", "mobilenet_v2_mid");
+        : path.join(__dirname, '..', 'models', 'mobilenet_v2_mid');
 
-      // Verify model.json exists
-      const modelJsonPath = path.join(modelDir, "model.json");
+      const modelJsonPath = path.join(modelDir, 'model.json');
       if (!fs.existsSync(modelJsonPath)) {
         throw new Error(`Missing model.json at ${modelDir}`);
       }
 
-      // Build proper file:// URL (normalize slashes + ensure trailing slash)
-      let normalized = modelDir.replace(/\\/g, "/");
-      if (!normalized.endsWith("/")) normalized += "/";
+      // Build file:// URL for tfjs-node loader (normalize slashes + trailing slash)
+      let normalized = modelDir.replace(/\\/g, '/');
+      if (!normalized.endsWith('/')) normalized += '/';
       const url = `file://${normalized}`;
 
-      // Load as graph model (MobileNetV2Mid)
-      this.nsfwModel = await nsfw.load(url, { type: "graph" });
+      this.nsfwModel = await nsfw.load(url, { type: 'graph' });
       this.initialized = true;
-      console.log("[MODERATION] ✅ NSFW model initialized");
+      console.log('[MODERATION] ✅ NSFW model initialized');
     })();
 
     try {
@@ -102,7 +99,7 @@ class ModerationService {
       this.loadingPromise = null;
     }
   }
-
+  
   async extractFrames(videoPath) {
     const tempDir = path.join(__dirname, "../temp");
     await fs.ensureDir(tempDir);
