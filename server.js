@@ -17,6 +17,25 @@ const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
 
+(async () => {
+  try {
+    // Create needed dirs first
+    const dirs = ["uploads", "processed", "temp", "models"];
+    for (const dir of dirs) await fs.ensureDir(path.join(__dirname, dir));
+
+    // 1) Warm up NSFWJS model
+    console.log("[BOOT] Preloading NSFW model...");
+    await moderationService.initialize(); // calls nsfw.load()
+    // 2) Optional: do a dummy pass to fully JIT kernels (reduces first-inference delay)
+    // await moderationService.moderateVisualContent(path.join(__dirname, "assets", "tiny.jpg")).catch(()=>{});
+
+    console.log("[BOOT] NSFW model ready");
+  } catch (e) {
+    console.error("[BOOT] Warmup failed:", e);
+    // Choose: continue (model will lazy-load per-request) or exit(1)
+  }
+})();
+
 // Create directories on startup
 const createDirectories = async () => {
   const dirs = ["uploads", "processed", "temp", "models"];
