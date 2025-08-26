@@ -141,9 +141,6 @@ thumbnails/
 ffmpeg_*
 *.ffpreset
 
-# Whisper model files (can be large)
-models/
-
 # Log files specific to video processing
 processing.log
 whisper.log
