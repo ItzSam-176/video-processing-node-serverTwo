@@ -28,6 +28,7 @@ class ModerationService {
     this.initialized = false;
     // Choose a heavier built-in by name; defaults to "MobileNetV2"
     this.modelName = process.env.NSFW_MODEL_NAME || "MobileNetV2Mid";
+    this.loadingPromise = null;
     this.modelOptions = {}; // e.g., for Inception: { size: 299, type: 'graph' }
   }
   //Working wiht base modal but not the best
@@ -61,34 +62,54 @@ class ModerationService {
   // }
   async initialize() {
     if (this.initialized) return;
-    console.log("[MODERATION] Initializing NSFW model...");
-    const modelName = process.env.NSFW_MODEL_NAME || "MobileNetV2Mid";
-    if (modelName === "MobileNetV2Mid" && process.env.NSFW_MODEL_DIR) {
-      const dir = process.env.NSFW_MODEL_DIR.startsWith("file://")
-        ? process.env.NSFW_MODEL_DIR
-        : "file://" +
-          process.env.NSFW_MODEL_DIR.replace(/\\/g, "/") +
-          (process.env.NSFW_MODEL_DIR.endsWith("/") ? "" : "/");
-      this.nsfwModel = await nsfw.load(dir, { type: "graph" });
-    } else if (modelName === "MobileNetV2" || modelName === "InceptionV3") {
-      this.nsfwModel = await nsfw.load(modelName); // bundled
-    } else {
-      // default to local path if provided, else bundled MobileNetV2
-      const localDir =
-        "file://" +
-        path.join(
-          __dirname,
-          "..",
-          "models",
-          "nsfw",
-          "mobilenet_v2_mid",
-          "web_model"
-        ) +
-        path.sep;
-      this.nsfwModel = await nsfw.load(localDir, { type: "graph" });
+    if (this.loadingPromise) {
+      await this.loadingPromise;
+      return;
     }
-    this.initialized = true;
-    console.log("[MODERATION] ✅ Model initialized successfully");
+
+    this.loadingPromise = (async () => {
+      console.log(
+        "[MODERATION] Initializing NSFW model (MobileNetV2Mid graph)..."
+      );
+
+      // Allow override via env, else default to local folder path
+      const envDir = process.env.NSFW_MODEL_DIR; // e.g. /app/models/nsfw/mobilenet_v2_mid/web_model
+      const modelDir = envDir
+        ? envDir
+        : path.join(
+            __dirname,
+            "..",
+            "models",
+            "nsfw",
+            "mobilenet_v2_mid",
+            "web_model"
+          );
+
+      // Verify model.json exists
+      const modelJsonPath = path.join(modelDir, "model.json");
+      if (!fs.existsSync(modelJsonPath)) {
+        throw new Error(`Missing model.json at ${modelDir}`);
+      }
+
+      // Build proper file:// URL with forward slashes and trailing slash
+      // 1) normalize Windows backslashes to forward slashes
+      let normalized = modelDir.replace(/\\/g, "/");
+      // 2) ensure trailing slash
+      if (!normalized.endsWith("/")) normalized += "/";
+      // 3) prefix with file://
+      const url = `file://${normalized}`;
+
+      // Load as graph model
+      this.nsfwModel = await nsfw.load(url, { type: "graph" });
+      this.initialized = true;
+      console.log("[MODERATION] ✅ NSFW model initialized");
+    })();
+
+    try {
+      await this.loadingPromise;
+    } finally {
+      this.loadingPromise = null;
+    }
   }
 
   async extractFrames(videoPath) {
