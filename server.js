@@ -36,6 +36,63 @@ const moderationService = require("./services/moderationService");
   }
 })();
 
+// readiness flags
+const readiness = {
+  nsfwModelLoaded: false,
+  ffmpegProbeOk: false,
+  whisperOkProbe: false,
+  lastError: null
+};
+
+// warmup function (run once)
+(async () => {
+  try {
+    // 1) Load NSFW model (if not already)
+    try {
+      await moderationService.initialize();
+      readiness.nsfwModelLoaded = true;
+    } catch (e) {
+      readiness.lastError = `nsfw: ${e.message}`;
+      console.error('[READY] NSFW init failed:', e);
+    }
+
+    // 2) ffmpeg probe a tiny synthetic or just exec ffprobe -version via fluent-ffmpeg
+    try {
+      await new Promise((resolve, reject) => {
+        const test = require('fluent-ffmpeg')();
+        // Calling ffprobe with no input won’t work; instead query version by spawning ffprobe via fluent-ffmpeg
+        test._getFfprobePath((err, ffprobePath) => {
+          if (err) return reject(err);
+          const { spawn } = require('child_process');
+          const p = spawn(ffprobePath, ['-version']);
+          p.on('exit', code => code === 0 ? resolve() : reject(new Error(`ffprobe exit ${code}`)));
+          p.on('error', reject);
+        });
+      });
+      readiness.ffmpegProbeOk = true;
+    } catch (e) {
+      readiness.lastError = `ffmpeg: ${e.message}`;
+      console.error('[READY] ffmpeg probe failed:', e);
+    }
+
+    // 3) Whisper probe: do a very quick noop by attempting to initialize the lib only
+    try {
+      await require('./services/whisperService').initialize();
+      readiness.whisperOkProbe = true;
+    } catch (e) {
+      readiness.lastError = `whisper: ${e.message}`;
+      console.error('[READY] Whisper probe failed:', e);
+    }
+
+    console.log('[READY] Warmup done:', readiness);
+  } catch (e) {
+    readiness.lastError = e.message;
+    console.error('[READY] Warmup wrapper failed:', e);
+  }
+})();
+
+
+
 // Create directories on startup
 const createDirectories = async () => {
   const dirs = ["uploads", "processed", "temp", "models"];
@@ -52,6 +109,16 @@ app.get("/", (req, res) =>
 app.get("/health", (req, res) =>
   res.json({ status: "OK", timestamp: new Date() })
 );
+
+// readiness: only 200 when all probes pass
+app.get('/ready', (_req, res) => {
+  const allOk = readiness.nsfwModelLoaded && readiness.ffmpegProbeOk && readiness.whisperOkProbe;
+  if (allOk) {
+    return res.status(200).json({ ready: true, ...readiness });
+  }
+  return res.status(503).json({ ready: false, ...readiness });
+});
+
 
 // Routes
 app.post(
