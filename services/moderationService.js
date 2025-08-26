@@ -89,6 +89,11 @@ async initialize() {
       const url = `file://${normalized}`;
 
       this.nsfwModel = await nsfw.load(url, { type: 'graph' });
+      this.matcher = new RegExpMatcher({
+        ...englishDataset.build(),
+        ...englishRecommendedTransformers,
+      });
+      this.censor = new TextCensor();
       this.initialized = true;
       console.log('[MODERATION] ✅ NSFW model initialized');
     })();
@@ -99,7 +104,7 @@ async initialize() {
       this.loadingPromise = null;
     }
   }
-  
+
   async extractFrames(videoPath) {
     const tempDir = path.join(__dirname, "../temp");
     await fs.ensureDir(tempDir);
