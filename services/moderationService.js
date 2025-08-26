@@ -29,7 +29,7 @@ class ModerationService {
     // Choose a heavier built-in by name; defaults to "MobileNetV2"
     this.modelName = process.env.NSFW_MODEL_NAME || "MobileNetV2Mid";
     this.loadingPromise = null;
-    this.modelOptions = {}; // e.g., for Inception: { size: 299, type: 'graph' }
+    // this.modelOptions = {}; // e.g., for Inception: { size: 299, type: 'graph' }
   }
   //Working wiht base modal but not the best
   // async initialize() {
@@ -72,18 +72,12 @@ class ModerationService {
         "[MODERATION] Initializing NSFW model (MobileNetV2Mid graph)..."
       );
 
-      // Allow override via env, else default to local folder path
-      const envDir = process.env.NSFW_MODEL_DIR; // e.g. /app/models/nsfw/mobilenet_v2_mid/web_model
+      // New folder layout:
+      // <project-root>/models/model/mobilenet_v2_mid/{model.json, group1-shard*.bin}
+      const envDir = process.env.NSFW_MODEL_DIR; // optional absolute path override
       const modelDir = envDir
         ? envDir
-        : path.join(
-            __dirname,
-            "..",
-            "models",
-            "nsfw",
-            "mobilenet_v2_mid",
-            "web_model"
-          );
+        : path.join(__dirname, "..", "models", "model", "mobilenet_v2_mid");
 
       // Verify model.json exists
       const modelJsonPath = path.join(modelDir, "model.json");
@@ -91,15 +85,12 @@ class ModerationService {
         throw new Error(`Missing model.json at ${modelDir}`);
       }
 
-      // Build proper file:// URL with forward slashes and trailing slash
-      // 1) normalize Windows backslashes to forward slashes
+      // Build proper file:// URL (normalize slashes + ensure trailing slash)
       let normalized = modelDir.replace(/\\/g, "/");
-      // 2) ensure trailing slash
       if (!normalized.endsWith("/")) normalized += "/";
-      // 3) prefix with file://
       const url = `file://${normalized}`;
 
-      // Load as graph model
+      // Load as graph model (MobileNetV2Mid)
       this.nsfwModel = await nsfw.load(url, { type: "graph" });
       this.initialized = true;
       console.log("[MODERATION] ✅ NSFW model initialized");
