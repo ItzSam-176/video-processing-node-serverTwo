@@ -14,15 +14,6 @@ const fs = require("fs-extra");
 const whisperService = require("./whisperService");
 const config = require("../config/moderation");
 class ModerationService {
-  // constructor() {
-  //   this.nsfwModel = null;
-  //   this.matcher = new RegExpMatcher({
-  //     ...englishDataset.build(),
-  //     ...englishRecommendedTransformers,
-  //   });
-  //   this.censor = new TextCensor();
-  //   this.initialized = false;
-  // }
   constructor() {
     this.nsfwModel = null;
     this.initialized = false;
@@ -31,35 +22,6 @@ class ModerationService {
     this.loadingPromise = null;
     // this.modelOptions = {}; // e.g., for Inception: { size: 299, type: 'graph' }
   }
-  //Working wiht base modal but not the best
-  // async initialize() {
-  //   try {
-  //     console.log("[MODERATION] Initializing NSFW model...");
-  //     this.nsfwModel = await nsfw.load();
-  //     this.initialized = true;
-  //     console.log("[MODERATION] ✅ Model initialized successfully");
-  //   } catch (error) {
-  //     console.error("[MODERATION] ❌ Failed to initialize:", error);
-  //     throw error;
-  //   }
-  // }
-  //Getting 502 errors with this model
-  // async initialize() {
-  //   try {
-  //     console.log(`[MODERATION] Loading NSFW model variant: ${this.modelName}`);
-  //     this.nsfwModel = await nsfw.load(this.modelName, this.modelOptions);
-  //     this.matcher = new RegExpMatcher({
-  //       ...englishDataset.build(),
-  //       ...englishRecommendedTransformers,
-  //     });
-  //     this.censor = new TextCensor();
-  //     this.initialized = true;
-  //     console.log("[MODERATION] ✅ NSFW model variant loaded");
-  //   } catch (error) {
-  //     console.error("[MODERATION] ❌ Failed to initialize NSFW model:", error);
-  //     throw error;
-  //   }
-  // }
 async initialize() {
     if (this.initialized) return;
     if (this.loadingPromise) {
