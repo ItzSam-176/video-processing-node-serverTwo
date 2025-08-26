@@ -77,7 +77,7 @@ class ModerationService {
       const envDir = process.env.NSFW_MODEL_DIR; // optional absolute path override
       const modelDir = envDir
         ? envDir
-        : path.join(__dirname, "..", "models", "model", "mobilenet_v2_mid");
+        : path.join(__dirname,"models", "mobilenet_v2_mid");
 
       // Verify model.json exists
       const modelJsonPath = path.join(modelDir, "model.json");
