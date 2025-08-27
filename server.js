@@ -3,6 +3,9 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs-extra");
 const { englishDataset } = require("obscenity");
+const winkNLP = require("wink-nlp");
+const model = require("wink-eng-lite-web-model");
+const natural = require("natural");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,6 +19,69 @@ const multer = require("multer");
 const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
+
+const nlp = winkNLP(model);
+const TfIdf = natural.TfIdf;
+const tfidf = new TfIdf();
+const { its } = nlp;
+
+function generateHashtagsFromArray(textArray, topN = 5) {
+  const tfidf = new TfIdf();
+
+  // Add each subtitle line as a separate document of keywords
+  textArray.forEach((line) => {
+    const doc = nlp.readDoc(line.toLowerCase());
+    const tokens = doc.tokens().filter((token) => {
+      const pos = token.out(its.pos);
+      const w = token.out(its.value);
+      return (
+        pos === "NOUN" ||
+        pos === "PROPN" ||
+        (pos === "ADJ" && w.length > 4) ||
+        (pos === "VERB" && w.length > 4)
+      );
+    });
+    const keywords = tokens.out().join(" ");
+    if (keywords.trim().length > 0) {
+      tfidf.addDocument(keywords);
+    }
+  });
+
+  // Collect all unique keywords across all documents
+  const allKeywords = new Set();
+
+  for (let i = 0; i < tfidf.documents.length; i++) {
+    const terms = tfidf.listTerms(i);
+    terms.forEach(({ term }) => allKeywords.add(term));
+  }
+
+  // Score keywords by total tf-idf across all documents
+  const scoredKeywords = Array.from(allKeywords).map((keyword) => {
+    let score = 0;
+    for (let i = 0; i < tfidf.documents.length; i++) {
+      score += tfidf.tfidf(keyword, i);
+    }
+    return { keyword, score };
+  });
+
+  scoredKeywords.sort((a, b) => b.score - a.score);
+
+  // Format top keywords as hashtags
+  const hashtags = scoredKeywords
+    .map(({ keyword }) => {
+      const cleaned = keyword.replace(/[^a-z0-9]/gi, "");
+      if (cleaned.length < 2) return null;
+      return (
+        "#" + cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase()
+      );
+    })
+    .filter(Boolean)
+    .slice(0, topN);
+
+  return hashtags;
+}
+
+
 
 (async () => {
   try {
@@ -145,11 +211,20 @@ app.post(
         language,
         translateToEnglish: translate_to_english === "true",
       });
+      console.log(
+        "[SUBTITLES-ONLY] Subtitles generated:",
+        subtitles.subtitles
+      );
+      const subtitleTexts = subtitles.subtitles.map((item) => item.text);
+      console.log("Extracted subtitle texts:", subtitleTexts);
+      const hashtags = generateHashtagsFromArray(subtitleTexts, 5);
 
+      console.log("Generated hashtags:", hashtags);
       // Return ONLY subtitles object
       res.json({
         success: true,
         subtitles: subtitles,
+        hashtags: hashtags,
         videoMetadata: {
           originalName: req.file.originalname,
         },
@@ -159,8 +234,6 @@ app.post(
     }
   }
 );
-
-
 
 // ✅ Enhanced process-video with safety check
 app.post("/process-video-safe", upload.single("video"), async (req, res) => {
