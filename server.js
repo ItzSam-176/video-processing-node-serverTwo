@@ -25,61 +25,61 @@ const TfIdf = natural.TfIdf;
 const tfidf = new TfIdf();
 const { its } = nlp;
 
-function generateHashtagsFromArray(textArray, topN = 5) {
-  const tfidf = new TfIdf();
+// function generateHashtagsFromArray(textArray, topN = 5) {
+//   const tfidf = new TfIdf();
 
-  // Add each subtitle line as a separate document of keyword
-  textArray.forEach((line) => {
-    const doc = nlp.readDoc(line.toLowerCase());
-    const tokens = doc.tokens().filter((token) => {
-      const pos = token.out(its.pos);
-      const w = token.out(its.value);
-      return (
-        pos === "NOUN" ||
-        pos === "PROPN" ||
-        (pos === "ADJ" && w.length > 4) ||
-        (pos === "VERB" && w.length > 4)
-      );
-    });
-    const keywords = tokens.out().join(" ");
-    if (keywords.trim().length > 0) {
-      tfidf.addDocument(keywords);
-    }
-  });
+//   // Add each subtitle line as a separate document of keyword
+//   textArray.forEach((line) => {
+//     const doc = nlp.readDoc(line.toLowerCase());
+//     const tokens = doc.tokens().filter((token) => {
+//       const pos = token.out(its.pos);
+//       const w = token.out(its.value);
+//       return (
+//         pos === "NOUN" ||
+//         pos === "PROPN" ||
+//         (pos === "ADJ" && w.length > 4) ||
+//         (pos === "VERB" && w.length > 4)
+//       );
+//     });
+//     const keywords = tokens.out().join(" ");
+//     if (keywords.trim().length > 0) {
+//       tfidf.addDocument(keywords);
+//     }
+//   });
 
-  // Collect all unique keywords across all documents
-  const allKeywords = new Set();
+//   // Collect all unique keywords across all documents
+//   const allKeywords = new Set();
 
-  for (let i = 0; i < tfidf.documents.length; i++) {
-    const terms = tfidf.listTerms(i);
-    terms.forEach(({ term }) => allKeywords.add(term));
-  }
+//   for (let i = 0; i < tfidf.documents.length; i++) {
+//     const terms = tfidf.listTerms(i);
+//     terms.forEach(({ term }) => allKeywords.add(term));
+//   }
 
-  // Score keywords by total tf-idf across all documents
-  const scoredKeywords = Array.from(allKeywords).map((keyword) => {
-    let score = 0;
-    for (let i = 0; i < tfidf.documents.length; i++) {
-      score += tfidf.tfidf(keyword, i);
-    }
-    return { keyword, score };
-  });
+//   // Score keywords by total tf-idf across all documents
+//   const scoredKeywords = Array.from(allKeywords).map((keyword) => {
+//     let score = 0;
+//     for (let i = 0; i < tfidf.documents.length; i++) {
+//       score += tfidf.tfidf(keyword, i);
+//     }
+//     return { keyword, score };
+//   });
 
-  scoredKeywords.sort((a, b) => b.score - a.score);
+//   scoredKeywords.sort((a, b) => b.score - a.score);
 
-  // Format top keywords as hashtags
-  const hashtags = scoredKeywords
-    .map(({ keyword }) => {
-      const cleaned = keyword.replace(/[^a-z0-9]/gi, "");
-      if (cleaned.length < 2) return null;
-      return (
-        "#" + cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase()
-      );
-    })
-    .filter(Boolean)
-    .slice(0, topN);
+//   // Format top keywords as hashtags
+//   const hashtags = scoredKeywords
+//     .map(({ keyword }) => {
+//       const cleaned = keyword.replace(/[^a-z0-9]/gi, "");
+//       if (cleaned.length < 2) return null;
+//       return (
+//         "#" + cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase()
+//       );
+//     })
+//     .filter(Boolean)
+//     .slice(0, topN);
 
-  return hashtags;
-}
+//   return hashtags;
+// }
 
 
 
