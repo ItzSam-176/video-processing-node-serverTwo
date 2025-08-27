@@ -28,7 +28,7 @@ const { its } = nlp;
 function generateHashtagsFromArray(textArray, topN = 5) {
   const tfidf = new TfIdf();
 
-  // Add each subtitle line as a separate document of keywords
+  // Add each subtitle line as a separate document of keyword
   textArray.forEach((line) => {
     const doc = nlp.readDoc(line.toLowerCase());
     const tokens = doc.tokens().filter((token) => {
