@@ -134,47 +134,12 @@ app.post(
 );
 
 // New endpoint: /generate-subtitles-only
-// app.post(
-//   "/generate-subtitles-only",
-//   upload.single("video"),
-//   async (req, res) => {
-//     try {
-//       const { language = "auto", translate_to_english = "false" } = req.body;
-
-//       // Generate subtitles using Whisper
-//       const subtitles = await whisperService.generateSubtitles(req.file.path, {
-//         language,
-//         translateToEnglish: translate_to_english === "true",
-//       });
-
-//       // Return ONLY subtitles object
-//       res.json({
-//         success: true,
-//         subtitles: subtitles,
-//         videoMetadata: {
-//           originalName: req.file.originalname,
-//         },
-//       });
-//     } catch (error) {
-//       res.status(500).json({ error: error.message });
-//     }
-//   }
-// );
-
-// Modified /generate-subtitles-only endpoint
 app.post(
   "/generate-subtitles-only",
   upload.single("video"),
   async (req, res) => {
     try {
-      const { 
-        language = "auto", 
-        translate_to_english = "false",
-        include_hashtags = "false",
-        hashtag_count = "3"
-      } = req.body;
-
-      console.log("[SUBTITLES] Generating subtitles...");
+      const { language = "auto", translate_to_english = "false" } = req.body;
 
       // Generate subtitles using Whisper
       const subtitles = await whisperService.generateSubtitles(req.file.path, {
@@ -182,62 +147,20 @@ app.post(
         translateToEnglish: translate_to_english === "true",
       });
 
-      console.log(`[SUBTITLES] ✅ Generated ${subtitles.segments_count} subtitle segments`);
-
-      // Prepare base response
-      const response = {
+      // Return ONLY subtitles object
+      res.json({
         success: true,
         subtitles: subtitles,
         videoMetadata: {
           originalName: req.file.originalname,
         },
-      };
-
-      // Optionally generate hashtags
-      if (include_hashtags === "true") {
-        console.log("[HASHTAGS] Hashtag generation requested...");
-        
-        try {
-          // Extract text from subtitles
-          if (subtitles.subtitles && subtitles.subtitles.length > 0) {
-            const textArray = subtitles.subtitles.map(sub => sub.text);
-            const videoId = `${req.file.originalname}_${Date.now()}`.replace(/[^a-zA-Z0-9_]/g, '_');
-            
-            console.log(`[HASHTAGS] Extracting hashtags from ${textArray.length} subtitle segments`);
-
-            const hashtagResult = await hashtagService.generateHashtags(textArray, {
-              count: parseInt(hashtag_count),
-              videoId
-            });
-
-            if (hashtagResult.success) {
-              response.hashtags = hashtagResult.hashtags;
-              console.log(`[HASHTAGS] ✅ Generated hashtags: ${hashtagResult.hashtags.join(', ')}`);
-            } else {
-              response.hashtags = [];
-              console.warn(`[HASHTAGS] ⚠️ ${hashtagResult.message}`);
-            }
-          } else {
-            response.hashtags = [];
-            console.warn("[HASHTAGS] ⚠️ No subtitles available for hashtag generation");
-          }
-        } catch (hashtagError) {
-          console.error("[HASHTAGS] ❌ Hashtag generation failed:", hashtagError.message);
-          response.hashtags = [];
-        }
-      }
-
-      res.json(response);
-
-    } catch (error) {
-      console.error("[ERROR] Subtitle generation failed:", error);
-      res.status(500).json({ 
-        success: false,
-        error: error.message 
       });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
   }
 );
+
 
 
 
