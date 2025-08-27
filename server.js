@@ -16,7 +16,6 @@ const multer = require("multer");
 const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
-const hashtagService = require("./services/hashtagService");
 
 (async () => {
   try {
