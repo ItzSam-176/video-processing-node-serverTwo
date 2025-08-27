@@ -1,194 +1,227 @@
 const winkNLP = require("wink-nlp");
-const model = require("wink-eng-lite-web-model");
+const winkModel = require("wink-eng-lite-web-model");
 const natural = require("natural");
-const TfIdf = natural.TfIdf;
 
 class HashtagService {
   constructor() {
-    // Initialize wink-nlp
-    this.nlp = winkNLP(model);
-    this.its = this.nlp.its;
-    this.as = this.nlp.as;
-
-    // Initialize TF-IDF corpus
-    this.tfidf = new TfIdf();
-    this.documentIds = new Map(); // Track which document belongs to which video
+    this.nlp = winkNLP(winkModel);
+    this.TfIdf = natural.TfIdf;
+    this.tfidf = new this.TfIdf();
+    this.processedVideos = new Map(); // Store processed video corpus
     this.initialized = false;
   }
 
-  // Step 1: Extract entities and keywords using wink-nlp
-  extractKeywords(subtitles) {
-    if (!subtitles || !Array.isArray(subtitles)) return [];
-
-    // Combine all subtitle text
-    const fullText = subtitles.map((sub) => sub.text).join(" ");
-    const doc = this.nlp.readDoc(fullText);
-
-    const keywords = new Set();
-
-    // Extract entities (locations, organizations, persons, etc.)
-    const entities = doc.entities().out(this.its.detail);
-    entities.forEach((entity) => {
-      if (["PERSON", "ORG", "GPE", "LOCATION", "EVENT"].includes(entity.type)) {
-        keywords.add(this.cleanKeyword(entity.value));
-      }
-    });
-
-    // Extract nouns and adjectives
-    const tokens = doc.tokens().out(this.its.detail);
-    tokens.forEach((token) => {
-      if (
-        ["NOUN", "PROPN", "ADJ"].includes(token.pos) &&
-        token.value.length > 2 &&
-        !token.stopWordFlag
-      ) {
-        keywords.add(this.cleanKeyword(token.value));
-      }
-    });
-
-    return Array.from(keywords).filter((keyword) => keyword.length > 0);
+  async initialize() {
+    if (this.initialized) return;
+    console.log("[HASHTAG] Initializing hashtag service...");
+    this.initialized = true;
+    console.log("[HASHTAG] ✅ Hashtag service ready");
   }
 
-  cleanKeyword(keyword) {
-    return keyword
-      .toLowerCase()
-      .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special chars
-      .replace(/\s+/g, "") // Remove spaces for hashtag format
-      .trim();
-  }
+  // Extract keywords using wink-nlp
+  extractKeywords(text) {
+    try {
+      const doc = this.nlp.readDoc(text.toLowerCase());
 
-  // Step 2: Add document to TF-IDF corpus
-  addDocumentToCorpus(videoId, keywords) {
-    if (!keywords || keywords.length === 0) return;
+      // Extract entities, important nouns, and significant terms
+      const entities = doc.entities().out();
+      const tokens = doc.tokens().filter((t) => {
+        return (
+          (t.out(this.nlp.its.type) === "word" &&
+            t.out(this.nlp.its.pos) === "NOUN") ||
+          t.out(this.nlp.its.pos) === "PROPN" ||
+          (t.out(this.nlp.its.pos) === "ADJ" && t.out().length > 4) ||
+          (t.out(this.nlp.its.pos) === "VERB" && t.out().length > 4)
+        );
+      });
 
-    // Join keywords as a document for TF-IDF
-    const keywordDocument = keywords.join(" ");
+      const keywords = [...entities.map((e) => e.value), ...tokens.out()];
 
-    // Add to TF-IDF corpus
-    this.tfidf.addDocument(keywordDocument);
-
-    // Track which document index belongs to which video
-    this.documentIds.set(this.tfidf.documents.length - 1, videoId);
-
-    console.log(
-      `[HASHTAG] Added ${keywords.length} keywords for video ${videoId} to corpus`
-    );
-  }
-
-  // Step 3: Generate hashtags with TF-IDF scoring
-  generateHashtags(videoId, keywords, topN = 10) {
-    if (!keywords || keywords.length === 0) return [];
-
-    // Find the document index for this video
-    let documentIndex = -1;
-    for (let [docIndex, vId] of this.documentIds.entries()) {
-      if (vId === videoId) {
-        documentIndex = docIndex;
-        break;
-      }
+      // Clean and filter keywords
+      return [...new Set(keywords)]
+        .filter(
+          (word) =>
+            word.length >= 3 &&
+            word.length <= 15 &&
+            !/^\d+$/.test(word) && // No pure numbers
+            ![
+              "the",
+              "and",
+              "for",
+              "are",
+              "but",
+              "not",
+              "you",
+              "all",
+              "can",
+              "had",
+              "her",
+              "was",
+              "one",
+              "our",
+              "out",
+              "day",
+              "get",
+              "has",
+              "him",
+              "his",
+              "how",
+              "man",
+              "new",
+              "now",
+              "old",
+              "see",
+              "two",
+              "way",
+              "who",
+              "boy",
+              "did",
+              "its",
+              "let",
+              "put",
+              "say",
+              "she",
+              "too",
+              "use",
+            ].includes(word.toLowerCase())
+        )
+        .slice(0, 20); // Limit to top 20 keywords
+    } catch (error) {
+      console.error("[HASHTAG] Keyword extraction failed:", error);
+      return [];
     }
+  }
 
-    if (documentIndex === -1) {
-      console.warn(`[HASHTAG] Video ${videoId} not found in corpus`);
-      return this.fallbackHashtags(keywords, topN);
+  // Calculate TF-IDF scores for keywords
+  calculateTFIDF(keywords, videoId) {
+    try {
+      // Add current document to corpus
+      this.tfidf.addDocument(keywords.join(" "));
+
+      const scores = [];
+      keywords.forEach((keyword) => {
+        const score = this.tfidf.tfidf(
+          keyword,
+          this.tfidf.documents.length - 1
+        );
+        if (score > 0) {
+          scores.push({ keyword, score });
+        }
+      });
+
+      // Sort by TF-IDF score and return top scoring keywords
+      return scores
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.keyword);
+    } catch (error) {
+      console.error("[HASHTAG] TF-IDF calculation failed:", error);
+      return keywords; // Fallback to original keywords
     }
-
-    // Calculate TF-IDF scores for all keywords
-    const scoredKeywords = keywords.map((keyword) => {
-      const score = this.tfidf.tfidf(keyword, documentIndex);
-      return { keyword, score };
-    });
-
-    // Sort by TF-IDF score (descending) and take top N
-    const topKeywords = scoredKeywords
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topN)
-      .map((item) => item.keyword);
-
-    // Convert to hashtags
-    return this.hashtagify(topKeywords);
   }
 
-  // Fallback when TF-IDF isn't available
-  fallbackHashtags(keywords, topN = 10) {
-    return this.hashtagify(keywords.slice(0, topN));
-  }
-
-  // Step 4: Convert keywords to hashtags
-  hashtagify(keywords) {
+  // Convert keywords to hashtags
+  keywordsToHashtags(keywords, count = 3) {
     return keywords
-      .filter((keyword) => keyword && keyword.length >= 2)
+      .slice(0, count)
       .map((keyword) => {
         // Clean and format as hashtag
-        let hashtag = keyword
-          .toLowerCase()
-          .replace(/[^a-zA-Z0-9]/g, "") // Remove all non-alphanumeric
-          .replace(/\s+/g, ""); // Remove any remaining spaces
+        const cleaned = keyword
+          .replace(/[^a-zA-Z0-9]/g, "")
+          .replace(/^\d+/, "") // Remove leading numbers
+          .toLowerCase();
 
-        // Capitalize first letter of each word for readability
-        hashtag = hashtag.replace(/\b\w/g, (l) => l.toUpperCase());
+        if (cleaned.length < 2) return null;
 
-        return `#${hashtag}`;
+        // Capitalize first letter
+        return "#" + cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
       })
-      .filter((hashtag) => hashtag.length > 2); // Filter out too-short hashtags
+      .filter((hashtag) => hashtag && hashtag.length > 2);
   }
 
-  // Process a single video's subtitles
-  async processVideo(videoId, subtitles, options = {}) {
+  // Main processing function
+  async generateHashtags(textArray, options = {}) {
     try {
+      await this.initialize();
+
+      const { count = 3, videoId = `video_${Date.now()}` } = options;
+
+      if (!textArray || textArray.length === 0) {
+        return {
+          success: false,
+          hashtags: [],
+          message: "No text provided for hashtag generation",
+        };
+      }
+
+      // Combine all subtitle text
+      const fullText = textArray.join(" ");
+
       console.log(
-        `[HASHTAG] Processing video ${videoId} for hashtag generation`
+        `[HASHTAG] Processing text for ${videoId}: ${fullText.substring(
+          0,
+          100
+        )}...`
       );
 
-      // Step 1: Extract keywords
-      const keywords = this.extractKeywords(subtitles);
-      console.log(
-        `[HASHTAG] Extracted ${keywords.length} keywords:`,
-        keywords.slice(0, 5)
-      );
+      // Extract keywords using wink-nlp
+      const keywords = this.extractKeywords(fullText);
 
       if (keywords.length === 0) {
         return {
           success: false,
           hashtags: [],
-          message: "No keywords extracted",
+          message: "No meaningful keywords extracted from text",
         };
       }
 
-      // Step 2: Add to corpus for future TF-IDF calculations
-      this.addDocumentToCorpus(videoId, keywords);
+      // Calculate TF-IDF scores
+      const rankedKeywords = this.calculateTFIDF(keywords, videoId);
 
-      // Step 3: Generate hashtags
-      const hashtags = this.generateHashtags(
-        videoId,
-        keywords,
-        options.topN || 10
-      );
+      // Convert to hashtags
+      const hashtags = this.keywordsToHashtags(rankedKeywords, count);
+
+      // Store processed video info
+      this.processedVideos.set(videoId, {
+        keywords: rankedKeywords,
+        hashtags,
+        processedAt: new Date(),
+      });
 
       console.log(
-        `[HASHTAG] Generated ${hashtags.length} hashtags for video ${videoId}`
+        `[HASHTAG] ✅ Generated ${hashtags.length} hashtags for ${videoId}`
       );
 
       return {
         success: true,
         hashtags,
-        keywords: keywords.slice(0, 15), // Return top keywords for debugging
+        keywords: rankedKeywords.slice(0, count * 2), // Return more keywords than hashtags
         totalKeywords: keywords.length,
-        message: `Generated ${hashtags.length} hashtags`,
+        message: `Generated ${hashtags.length} hashtags from ${keywords.length} keywords`,
       };
     } catch (error) {
-      console.error(`[HASHTAG] Error processing video ${videoId}:`, error);
-      return { success: false, hashtags: [], error: error.message };
+      console.error("[HASHTAG] Generation failed:", error);
+      return {
+        success: false,
+        hashtags: [],
+        error: error.message,
+        message: "Hashtag generation failed",
+      };
     }
   }
 
   // Get corpus statistics
   getCorpusStats() {
     return {
-      totalDocuments: this.tfidf.documents.length,
-      vocabularySize: Object.keys(this.tfidf.vocabulary).length,
-      documentsTracked: this.documentIds.size,
+      totalVideosProcessed: this.processedVideos.size,
+      corpusDocuments: this.tfidf.documents.length,
+      lastProcessed:
+        this.processedVideos.size > 0
+          ? Math.max(
+              ...Array.from(this.processedVideos.values()).map((v) =>
+                v.processedAt.getTime()
+              )
+            )
+          : null,
     };
   }
 }
