@@ -21,11 +21,14 @@
     "jimp": "^1.6.0",
     "mime-types": "^3.0.1",
     "multer": "^2.0.2",
+    "natural": "^8.1.0",
     "nodejs-whisper": "^0.2.9",
     "nsfwjs": "^4.2.1",
     "obscenity": "^0.4.4",
     "sharp": "^0.34.3",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "wink-eng-lite-web-model": "^1.8.1",
+    "wink-nlp": "^2.4.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

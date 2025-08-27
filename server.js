@@ -501,6 +501,53 @@ function formatDuration(seconds) {
   }
 }
 
+// Add after existing routes
+app.post('/generate-hashtags', require('./controllers/hashtagController').generateHashtags);
+app.get('/hashtag-corpus-stats', require('./controllers/hashtagController').getCorpusStats);
+
+app.post(
+  "/generate-subtitles-with-hashtags",
+  upload.single("video"),
+  async (req, res) => {
+    try {
+      const {
+        language = "auto",
+        translate_to_english = "false",
+        generate_hashtags = "true",
+        hashtag_count = "10",
+      } = req.body;
+
+      // Generate subtitles
+      const subtitles = await whisperService.generateSubtitles(req.file.path, {
+        language,
+        translateToEnglish: translate_to_english === "true",
+      });
+
+      let hashtagResult = null;
+      if (generate_hashtags === "true" && subtitles.subtitles) {
+        const videoId = `video_${Date.now()}_${req.file.originalname}`;
+        hashtagResult = await require("./services/hashtagService").processVideo(
+          videoId,
+          subtitles.subtitles,
+          { topN: parseInt(hashtag_count) }
+        );
+      }
+
+      res.json({
+        success: true,
+        subtitles: subtitles,
+        hashtags: hashtagResult?.hashtags || [],
+        hashtagGeneration: hashtagResult,
+        videoMetadata: {
+          originalName: req.file.originalname,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // Serve processed files
 app.use("/processed-videos", express.static("processed"));
 

@@ -62,9 +62,37 @@ const generateSubtitles = [
         audioFile?.path || videoFile.path,
         params
       );
+      // NEW: Generate hashtags if requested
+      let hashtagResult = null;
+      if (req.body.generate_hashtags === "true" && result.subtitles) {
+        const videoId = `video_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+        hashtagResult = await hashtagService.processVideo(
+          videoId,
+          result.subtitles,
+          {
+            topN: parseInt(req.body.hashtag_count || 10),
+          }
+        );
+      }
 
       console.log("[SUCCESS] Subtitles generated:", result.segments_count);
-      res.json(result);
+
+      // Enhanced response with hashtags
+      const response = {
+        ...result,
+        hashtags: hashtagResult?.hashtags || [],
+        hashtagGeneration: hashtagResult
+          ? {
+              success: hashtagResult.success,
+              totalKeywords: hashtagResult.totalKeywords,
+              message: hashtagResult.message,
+            }
+          : null,
+      };
+
+      res.json(response);
     } catch (error) {
       console.error("[ERROR] Subtitle generation failed:", error);
       res.status(500).json({
