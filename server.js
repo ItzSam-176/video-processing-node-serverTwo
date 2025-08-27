@@ -490,27 +490,6 @@ app.post(
   }
 );
 
-// Add this test endpoint to server.js
-app.post("/test-hashtags", async (req, res) => {
-  try {
-    const { text_array, hashtag_count = "3" } = req.body;
-    
-    if (!text_array || !Array.isArray(text_array)) {
-      return res.status(400).json({ error: "text_array is required" });
-    }
-
-    const hashtagResult = await hashtagService.generateHashtags(text_array, {
-      count: parseInt(hashtag_count),
-      videoId: `test_${Date.now()}`
-    });
-
-    res.json(hashtagResult);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
 // ✅ KEPT: Helper function (used in response formatting)
 function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
