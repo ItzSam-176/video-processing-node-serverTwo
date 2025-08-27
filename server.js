@@ -20,10 +20,10 @@ const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
 
-const nlp = winkNLP(model);
-const TfIdf = natural.TfIdf;
-const tfidf = new TfIdf();
-const { its } = nlp;
+// const nlp = winkNLP(model);
+// const TfIdf = natural.TfIdf;
+// const tfidf = new TfIdf();
+// const { its } = nlp;
 
 // function generateHashtagsFromArray(textArray, topN = 5) {
 //   const tfidf = new TfIdf();
