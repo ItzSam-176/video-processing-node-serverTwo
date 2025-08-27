@@ -3,9 +3,9 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs-extra");
 const { englishDataset } = require("obscenity");
-const winkNLP = require("wink-nlp");
-const model = require("wink-eng-lite-web-model");
-const natural = require("natural");
+// const winkNLP = require("wink-nlp");
+// const model = require("wink-eng-lite-web-model");
+// const natural = require("natural");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
