@@ -16,7 +16,7 @@ const multer = require("multer");
 const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
-
+const hashtagService = require("./services/hashtagService");
 (async () => {
   try {
     // Create needed dirs first
@@ -131,32 +131,32 @@ app.post(
 );
 
 // New endpoint: /generate-subtitles-only
-app.post(
-  "/generate-subtitles-only",
-  upload.single("video"),
-  async (req, res) => {
-    try {
-      const { language = "auto", translate_to_english = "false" } = req.body;
+// app.post(
+//   "/generate-subtitles-only",
+//   upload.single("video"),
+//   async (req, res) => {
+//     try {
+//       const { language = "auto", translate_to_english = "false" } = req.body;
 
-      // Generate subtitles using Whisper
-      const subtitles = await whisperService.generateSubtitles(req.file.path, {
-        language,
-        translateToEnglish: translate_to_english === "true",
-      });
+//       // Generate subtitles using Whisper
+//       const subtitles = await whisperService.generateSubtitles(req.file.path, {
+//         language,
+//         translateToEnglish: translate_to_english === "true",
+//       });
 
-      // Return ONLY subtitles object
-      res.json({
-        success: true,
-        subtitles: subtitles,
-        videoMetadata: {
-          originalName: req.file.originalname,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
+//       // Return ONLY subtitles object
+//       res.json({
+//         success: true,
+//         subtitles: subtitles,
+//         videoMetadata: {
+//           originalName: req.file.originalname,
+//         },
+//       });
+//     } catch (error) {
+//       res.status(500).json({ error: error.message });
+//     }
+//   }
+// );
 
 // ✅ Enhanced process-video with safety check
 app.post("/process-video-safe", upload.single("video"), async (req, res) => {
@@ -486,6 +486,86 @@ app.post(
   }
 );
 
+// Modified /generate-subtitles-only endpoint
+app.post(
+  "/generate-subtitles-only",
+  upload.single("video"),
+  async (req, res) => {
+    try {
+      const { 
+        language = "auto", 
+        translate_to_english = "false",
+        generate_hashtags = "false",  // New parameter
+        hashtag_count = "10"          // New parameter
+      } = req.body;
+
+      // Generate subtitles using Whisper
+      const subtitles = await whisperService.generateSubtitles(req.file.path, {
+        language,
+        translateToEnglish: translate_to_english === "true",
+      });
+
+      // Prepare base response
+      const response = {
+        success: true,
+        subtitles: subtitles,
+        videoMetadata: {
+          originalName: req.file.originalname,
+        },
+      };
+
+      // Optionally generate hashtags
+      if (generate_hashtags === "true" && subtitles.subtitles && subtitles.subtitles.length > 0) {
+        try {
+          console.log("[HASHTAGS] Generating hashtags for subtitle content...");
+          
+          const videoId = `video_${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const hashtagResult = await hashtagService.processVideo(
+            videoId, 
+            subtitles.subtitles, 
+            { topN: parseInt(hashtag_count) }
+          );
+
+          // Add hashtag results to response
+          response.hashtags = hashtagResult.hashtags || [];
+          response.hashtagGeneration = {
+            success: hashtagResult.success,
+            totalKeywords: hashtagResult.totalKeywords,
+            message: hashtagResult.message,
+            corpusStats: hashtagService.getCorpusStats()
+          };
+          
+          console.log(`[HASHTAGS] Generated ${response.hashtags.length} hashtags`);
+        } catch (hashtagError) {
+          console.error("[HASHTAGS] Failed to generate hashtags:", hashtagError);
+          
+          // Include error in response but don't fail the entire request
+          response.hashtags = [];
+          response.hashtagGeneration = {
+            success: false,
+            error: hashtagError.message,
+            message: "Hashtag generation failed, but subtitles were successful"
+          };
+        }
+      } else {
+        // No hashtags requested or no subtitles available
+        response.hashtags = [];
+        response.hashtagGeneration = {
+          success: true,
+          message: generate_hashtags === "true" 
+            ? "No subtitles available for hashtag generation" 
+            : "Hashtag generation not requested"
+        };
+      }
+
+      res.json(response);
+    } catch (error) {
+      console.error("[ERROR] Subtitle generation failed:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // ✅ KEPT: Helper function (used in response formatting)
 function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
@@ -501,52 +581,7 @@ function formatDuration(seconds) {
   }
 }
 
-// Add after existing routes
-app.post('/generate-hashtags', require('./controllers/hashtagController').generateHashtags);
-app.get('/hashtag-corpus-stats', require('./controllers/hashtagController').getCorpusStats);
 
-app.post(
-  "/generate-subtitles-with-hashtags",
-  upload.single("video"),
-  async (req, res) => {
-    try {
-      const {
-        language = "auto",
-        translate_to_english = "false",
-        generate_hashtags = "true",
-        hashtag_count = "10",
-      } = req.body;
-
-      // Generate subtitles
-      const subtitles = await whisperService.generateSubtitles(req.file.path, {
-        language,
-        translateToEnglish: translate_to_english === "true",
-      });
-
-      let hashtagResult = null;
-      if (generate_hashtags === "true" && subtitles.subtitles) {
-        const videoId = `video_${Date.now()}_${req.file.originalname}`;
-        hashtagResult = await require("./services/hashtagService").processVideo(
-          videoId,
-          subtitles.subtitles,
-          { topN: parseInt(hashtag_count) }
-        );
-      }
-
-      res.json({
-        success: true,
-        subtitles: subtitles,
-        hashtags: hashtagResult?.hashtags || [],
-        hashtagGeneration: hashtagResult,
-        videoMetadata: {
-          originalName: req.file.originalname,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
 
 // Serve processed files
 app.use("/processed-videos", express.static("processed"));
