@@ -16,7 +16,7 @@ const multer = require("multer");
 const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
-const hashtagService = require("./services/hashtagService");
+
 (async () => {
   try {
     // Create needed dirs first
@@ -41,7 +41,7 @@ const readiness = {
   nsfwModelLoaded: false,
   ffmpegProbeOk: false,
   whisperOkProbe: false,
-  lastError: null
+  lastError: null,
 };
 
 // warmup function (run once)
@@ -53,45 +53,45 @@ const readiness = {
       readiness.nsfwModelLoaded = true;
     } catch (e) {
       readiness.lastError = `nsfw: ${e.message}`;
-      console.error('[READY] NSFW init failed:', e);
+      console.error("[READY] NSFW init failed:", e);
     }
 
     // 2) ffmpeg probe a tiny synthetic or just exec ffprobe -version via fluent-ffmpeg
     try {
       await new Promise((resolve, reject) => {
-        const test = require('fluent-ffmpeg')();
+        const test = require("fluent-ffmpeg")();
         // Calling ffprobe with no input won’t work; instead query version by spawning ffprobe via fluent-ffmpeg
         test._getFfprobePath((err, ffprobePath) => {
           if (err) return reject(err);
-          const { spawn } = require('child_process');
-          const p = spawn(ffprobePath, ['-version']);
-          p.on('exit', code => code === 0 ? resolve() : reject(new Error(`ffprobe exit ${code}`)));
-          p.on('error', reject);
+          const { spawn } = require("child_process");
+          const p = spawn(ffprobePath, ["-version"]);
+          p.on("exit", (code) =>
+            code === 0 ? resolve() : reject(new Error(`ffprobe exit ${code}`))
+          );
+          p.on("error", reject);
         });
       });
       readiness.ffmpegProbeOk = true;
     } catch (e) {
       readiness.lastError = `ffmpeg: ${e.message}`;
-      console.error('[READY] ffmpeg probe failed:', e);
+      console.error("[READY] ffmpeg probe failed:", e);
     }
 
     // 3) Whisper probe: do a very quick noop by attempting to initialize the lib only
     try {
-      await require('./services/whisperService').initialize();
+      await require("./services/whisperService").initialize();
       readiness.whisperOkProbe = true;
     } catch (e) {
       readiness.lastError = `whisper: ${e.message}`;
-      console.error('[READY] Whisper probe failed:', e);
+      console.error("[READY] Whisper probe failed:", e);
     }
 
-    console.log('[READY] Warmup done:', readiness);
+    console.log("[READY] Warmup done:", readiness);
   } catch (e) {
     readiness.lastError = e.message;
-    console.error('[READY] Warmup wrapper failed:', e);
+    console.error("[READY] Warmup wrapper failed:", e);
   }
 })();
-
-
 
 // Create directories on startup
 const createDirectories = async () => {
@@ -111,14 +111,16 @@ app.get("/health", (req, res) =>
 );
 
 // readiness: only 200 when all probes pass
-app.get('/ready', (_req, res) => {
-  const allOk = readiness.nsfwModelLoaded && readiness.ffmpegProbeOk && readiness.whisperOkProbe;
+app.get("/ready", (_req, res) => {
+  const allOk =
+    readiness.nsfwModelLoaded &&
+    readiness.ffmpegProbeOk &&
+    readiness.whisperOkProbe;
   if (allOk) {
     return res.status(200).json({ ready: true, ...readiness });
   }
   return res.status(503).json({ ready: false, ...readiness });
 });
-
 
 // Routes
 app.post(
@@ -131,32 +133,32 @@ app.post(
 );
 
 // New endpoint: /generate-subtitles-only
-// app.post(
-//   "/generate-subtitles-only",
-//   upload.single("video"),
-//   async (req, res) => {
-//     try {
-//       const { language = "auto", translate_to_english = "false" } = req.body;
+app.post(
+  "/generate-subtitles-only",
+  upload.single("video"),
+  async (req, res) => {
+    try {
+      const { language = "auto", translate_to_english = "false" } = req.body;
 
-//       // Generate subtitles using Whisper
-//       const subtitles = await whisperService.generateSubtitles(req.file.path, {
-//         language,
-//         translateToEnglish: translate_to_english === "true",
-//       });
+      // Generate subtitles using Whisper
+      const subtitles = await whisperService.generateSubtitles(req.file.path, {
+        language,
+        translateToEnglish: translate_to_english === "true",
+      });
 
-//       // Return ONLY subtitles object
-//       res.json({
-//         success: true,
-//         subtitles: subtitles,
-//         videoMetadata: {
-//           originalName: req.file.originalname,
-//         },
-//       });
-//     } catch (error) {
-//       res.status(500).json({ error: error.message });
-//     }
-//   }
-// );
+      // Return ONLY subtitles object
+      res.json({
+        success: true,
+        subtitles: subtitles,
+        videoMetadata: {
+          originalName: req.file.originalname,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
 // ✅ Enhanced process-video with safety check
 app.post("/process-video-safe", upload.single("video"), async (req, res) => {
@@ -486,86 +488,6 @@ app.post(
   }
 );
 
-// Modified /generate-subtitles-only endpoint
-app.post(
-  "/generate-subtitles-only",
-  upload.single("video"),
-  async (req, res) => {
-    try {
-      const { 
-        language = "auto", 
-        translate_to_english = "false",
-        generate_hashtags = "false",  // New parameter
-        hashtag_count = "10"          // New parameter
-      } = req.body;
-
-      // Generate subtitles using Whisper
-      const subtitles = await whisperService.generateSubtitles(req.file.path, {
-        language,
-        translateToEnglish: translate_to_english === "true",
-      });
-
-      // Prepare base response
-      const response = {
-        success: true,
-        subtitles: subtitles,
-        videoMetadata: {
-          originalName: req.file.originalname,
-        },
-      };
-
-      // Optionally generate hashtags
-      if (generate_hashtags === "true" && subtitles.subtitles && subtitles.subtitles.length > 0) {
-        try {
-          console.log("[HASHTAGS] Generating hashtags for subtitle content...");
-          
-          const videoId = `video_${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9]/g, '_')}`;
-          const hashtagResult = await hashtagService.processVideo(
-            videoId, 
-            subtitles.subtitles, 
-            { topN: parseInt(hashtag_count) }
-          );
-
-          // Add hashtag results to response
-          response.hashtags = hashtagResult.hashtags || [];
-          response.hashtagGeneration = {
-            success: hashtagResult.success,
-            totalKeywords: hashtagResult.totalKeywords,
-            message: hashtagResult.message,
-            corpusStats: hashtagService.getCorpusStats()
-          };
-          
-          console.log(`[HASHTAGS] Generated ${response.hashtags.length} hashtags`);
-        } catch (hashtagError) {
-          console.error("[HASHTAGS] Failed to generate hashtags:", hashtagError);
-          
-          // Include error in response but don't fail the entire request
-          response.hashtags = [];
-          response.hashtagGeneration = {
-            success: false,
-            error: hashtagError.message,
-            message: "Hashtag generation failed, but subtitles were successful"
-          };
-        }
-      } else {
-        // No hashtags requested or no subtitles available
-        response.hashtags = [];
-        response.hashtagGeneration = {
-          success: true,
-          message: generate_hashtags === "true" 
-            ? "No subtitles available for hashtag generation" 
-            : "Hashtag generation not requested"
-        };
-      }
-
-      res.json(response);
-    } catch (error) {
-      console.error("[ERROR] Subtitle generation failed:", error);
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
 // ✅ KEPT: Helper function (used in response formatting)
 function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
@@ -581,8 +503,6 @@ function formatDuration(seconds) {
   }
 }
 
-
-
 // Serve processed files
 app.use("/processed-videos", express.static("processed"));
 
@@ -596,9 +516,9 @@ const http = require("http");
 const server = http.createServer(app);
 
 // Tune Node/Express timeouts (values in milliseconds)
-server.requestTimeout = 180000;      // how long to wait for the entire request/response cycle (3 min) [web:225]
-server.headersTimeout = 180000;      // how long to wait for incoming headers (3 min) [web:225]
-server.keepAliveTimeout = 90000;     // idle keep-alive timeout (1.5 min) [web:225]
+server.requestTimeout = 180000; // how long to wait for the entire request/response cycle (3 min) [web:225]
+server.headersTimeout = 180000; // how long to wait for incoming headers (3 min) [web:225]
+server.keepAliveTimeout = 90000; // idle keep-alive timeout (1.5 min) [web:225]
 
 // Optional: increase socket timeout too (older Node behavior)
 server.timeout = 0; // 0 = no automatic timeout; rely on requestTimeout above [web:225]
@@ -607,4 +527,3 @@ server.timeout = 0; // 0 = no automatic timeout; rely on requestTimeout above [w
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Video Processor Server running on port ${PORT}`);
 });
-
