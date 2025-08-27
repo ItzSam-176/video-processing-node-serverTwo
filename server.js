@@ -211,20 +211,20 @@ app.post(
         language,
         translateToEnglish: translate_to_english === "true",
       });
-      console.log(
-        "[SUBTITLES-ONLY] Subtitles generated:",
-        subtitles.subtitles
-      );
-      const subtitleTexts = subtitles.subtitles.map((item) => item.text);
-      console.log("Extracted subtitle texts:", subtitleTexts);
-      const hashtags = generateHashtagsFromArray(subtitleTexts, 5);
+      // console.log(
+      //   "[SUBTITLES-ONLY] Subtitles generated:",
+      //   subtitles.subtitles
+      // );
+      // const subtitleTexts = subtitles.subtitles.map((item) => item.text);
+      // console.log("Extracted subtitle texts:", subtitleTexts);
+      // const hashtags = generateHashtagsFromArray(subtitleTexts, 5);
 
       console.log("Generated hashtags:", hashtags);
       // Return ONLY subtitles object
       res.json({
         success: true,
         subtitles: subtitles,
-        hashtags: hashtags,
+        // hashtags: hashtags,
         videoMetadata: {
           originalName: req.file.originalname,
         },
