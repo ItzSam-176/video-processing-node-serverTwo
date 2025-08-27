@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs-extra");
 const { englishDataset } = require("obscenity");
 const winkNLP = require("wink-nlp");
-// const model = require("wink-eng-lite-web-model");
+const model = require("wink-eng-lite-web-model");
 // const natural = require("natural");
 
 const app = express();
@@ -219,7 +219,7 @@ app.post(
       // console.log("Extracted subtitle texts:", subtitleTexts);
       // const hashtags = generateHashtagsFromArray(subtitleTexts, 5);
 
-      console.log("Generated hashtags:", hashtags);
+      // console.log("Generated hashtags:", hashtags);
       // Return ONLY subtitles object
       res.json({
         success: true,
