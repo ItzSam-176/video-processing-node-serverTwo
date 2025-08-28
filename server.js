@@ -5,7 +5,7 @@ const fs = require("fs-extra");
 const { englishDataset } = require("obscenity");
 const winkNLP = require("wink-nlp");
 const model = require("wink-eng-lite-web-model");
-// const natural = require("natural");
+const TfIdf = require("tf-idf-search");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,10 +20,8 @@ const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
 
-// const nlp = winkNLP(model);
-// const TfIdf = natural.TfIdf;
-// const tfidf = new TfIdf();
-// const { its } = nlp;
+const nlp = winkNLP(model);
+const { its } = nlp;
 
 // function generateHashtagsFromArray(textArray, topN = 5) {
 //   const tfidf = new TfIdf();
@@ -81,6 +79,62 @@ const moderationService = require("./services/moderationService");
 //   return hashtags;
 // }
 
+function generateHashtagsFromArray(textArray, topN = 5) {
+  const tfidf = new TfIdf();
+
+  // Prepare processed keyword lines for corpus
+  const keywordLines = textArray
+    .map((line) => {
+      const doc = nlp.readDoc(line.toLowerCase());
+      const tokens = doc.tokens().filter((token) => {
+        const pos = token.out(its.pos);
+        const w = token.out(its.value);
+        return (
+          pos === "NOUN" ||
+          pos === "PROPN" ||
+          (pos === "ADJ" && w.length > 4) ||
+          (pos === "VERB" && w.length > 4)
+        );
+      });
+      const keywords = tokens.out().join(" ");
+      return keywords.trim();
+    })
+    .filter((keywords) => keywords.length > 0);
+
+  // Add keyword lines to tf-idf corpus
+  tfidf.createCorpusFromStringArray(keywordLines);
+
+  // Collect all unique keywords across the corpus
+  const allKeywords = new Set();
+  tfidf.corpus.forEach((docTerms) => {
+    docTerms.forEach((term) => allKeywords.add(term));
+  });
+
+  // Score keywords by total TF-IDF across all documents
+  const scoredKeywords = Array.from(allKeywords).map((keyword) => {
+    let score = 0;
+    for (let i = 0; i < tfidf.corpus.length; i++) {
+      score += tfidf.createVectorSpaceModel(keyword, tfidf.corpus[i]) || 0;
+    }
+    return { keyword, score };
+  });
+
+  scoredKeywords.sort((a, b) => b.score - a.score);
+
+  // Format top keywords as hashtags
+  const hashtags = scoredKeywords
+    .map(({ keyword }) => {
+      const cleaned = keyword.replace(/[^a-z0-9]/gi, "");
+      if (cleaned.length < 2) return null;
+      return (
+        "#" + cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase()
+      );
+    })
+    .filter(Boolean)
+    .slice(0, topN);
+
+  return hashtags;
+}
 
 
 (async () => {
@@ -211,20 +265,20 @@ app.post(
         language,
         translateToEnglish: translate_to_english === "true",
       });
-      // console.log(
-      //   "[SUBTITLES-ONLY] Subtitles generated:",
-      //   subtitles.subtitles
-      // );
-      // const subtitleTexts = subtitles.subtitles.map((item) => item.text);
-      // console.log("Extracted subtitle texts:", subtitleTexts);
-      // const hashtags = generateHashtagsFromArray(subtitleTexts, 5);
+      console.log(
+        "[SUBTITLES-ONLY] Subtitles generated:",
+        subtitles.subtitles
+      );
+      const subtitleTexts = subtitles.subtitles.map((item) => item.text);
+      console.log("Extracted subtitle texts:", subtitleTexts);
+      const hashtags = generateHashtagsFromArray(subtitleTexts, 5);
 
-      // console.log("Generated hashtags:", hashtags);
+      console.log("Generated hashtags:", hashtags);
       // Return ONLY subtitles object
       res.json({
         success: true,
         subtitles: subtitles,
-        // hashtags: hashtags,
+        hashtags: hashtags,
         videoMetadata: {
           originalName: req.file.originalname,
         },
