@@ -3,9 +3,8 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs-extra");
 const { englishDataset } = require("obscenity");
-const winkNLP = require("wink-nlp");
-const model = require("wink-eng-lite-web-model");
 // const TfIdf = require("tf-idf-search");
+const rake = require("node-rake");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,8 +19,6 @@ const upload = multer({ dest: path.join(__dirname, "uploads") });
 const whisperService = require("./services/whisperService");
 const moderationService = require("./services/moderationService");
 
-const nlp = winkNLP(model);
-const { its } = nlp;
 
 // function generateHashtagsFromArray(textArray, topN = 5) {
 //   const tfidf = new TfIdf();
@@ -139,37 +136,159 @@ const { its } = nlp;
 // }
 
 // const TfIdf = require("tf-idf-search"); // Commented out as per instruction
+//Function with ranking removed
+// function generateHashtagsFromArray(textArray, topN = 5) {
+//   // Comment out tf-idf ranking logic
+
+//   // Use wink-nlp only to extract keywords as hashtags without ranking
+//   const hashtags = [];
+
+//   textArray.forEach((line) => {
+//     const doc = nlp.readDoc(line.toLowerCase());
+//     const tokens = doc.tokens().filter((token) => {
+//       const pos = token.out(its.pos);
+//       const w = token.out(its.value);
+//       return (
+//         pos === "NOUN" ||
+//         pos === "PROPN" ||
+//         (pos === "ADJ" && w.length > 4) ||
+//         (pos === "VERB" && w.length > 4)
+//       );
+//     });
+//     tokens.out().forEach((keyword) => {
+//       const cleaned = keyword.replace(/[^a-z0-9]/gi, "");
+//       if (cleaned.length >= 2) {
+//         hashtags.push("#" + cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase());
+//       }
+//     });
+//   });
+
+//   // Deduplicate and limit to topN without ranking
+//   const uniqueHashtags = Array.from(new Set(hashtags)).slice(0, topN);
+
+//   return uniqueHashtags;
+// }
+
+// function generateHashtagsFromArray(textArray, topN = 5) {
+//   // 1. Build documents as token arrays, filtering by POS as before
+//   const documents = textArray.map((line) => {
+//     const doc = nlp.readDoc(line.toLowerCase());
+//     const tokens = doc.tokens().filter((token) => {
+//       const pos = token.out(its.pos);
+//       const w = token.out(its.value);
+//       return (
+//         pos === "NOUN" ||
+//         pos === "PROPN" ||
+//         (pos === "ADJ" && w.length > 4) ||
+//         (pos === "VERB" && w.length > 4)
+//       );
+//     });
+//     return tokens
+//       .out()
+//       .map((w) => w.replace(/[^a-z0-9]/gi, ""))
+//       .filter((w) => w.length > 1);
+//   });
+
+//   const totalDocs = documents.length;
+
+//   // 2. Calculate DF (document frequency) for each term
+//   const df = {};
+//   documents.forEach((doc, i) => {
+//     const uniqueTerms = new Set(doc);
+//     uniqueTerms.forEach((term) => {
+//       df[term] = (df[term] || 0) + 1;
+//     });
+//   });
+
+//   // 3. Calculate TF-IDF scores aggregated over all documents
+//   const tfidfScores = {};
+//   documents.forEach((doc) => {
+//     const termCounts = {};
+//     doc.forEach((term) => {
+//       termCounts[term] = (termCounts[term] || 0) + 1;
+//     });
+
+//     const docLength = doc.length;
+
+//     for (const term in termCounts) {
+//       const tf = termCounts[term] / docLength;
+//       const idf = Math.log(totalDocs / (1 + (df[term] || 0)));
+//       const tfidf = tf * idf;
+//       tfidfScores[term] = (tfidfScores[term] || 0) + tfidf;
+//     }
+//   });
+
+//   // Log each word and its TF-IDF score
+//   console.log("TF-IDF scores for keywords:");
+//   Object.entries(tfidfScores)
+//     .sort(([, a], [, b]) => b - a)
+//     .forEach(([term, score]) => {
+//       console.log(`${term}: ${score.toFixed(5)}`);
+//     });
+
+//   // 4. Sort terms by aggregated TF-IDF score descending
+//   const sortedTerms = Object.entries(tfidfScores)
+//     .sort((a, b) => b[1] - a[1])
+//     .map(([term]) => term);
+
+//   // 5. Format top terms as hashtags
+//   const hashtags = sortedTerms
+//     .slice(0, topN)
+//     .map(
+//       (term) => "#" + term.charAt(0).toUpperCase() + term.slice(1).toLowerCase()
+//     );
+
+//   return hashtags;
+// }
 
 function generateHashtagsFromArray(textArray, topN = 5) {
-  // Comment out tf-idf ranking logic
+  if (!Array.isArray(textArray) || textArray.length === 0) {
+    console.log("Warning: textArray is empty or not an array");
+    return ["#NoHashtags"];
+  }
 
-  // Use wink-nlp only to extract keywords as hashtags without ranking
-  const hashtags = [];
+  const combinedText = textArray.filter(Boolean).join(". ").trim();
+  if (!combinedText) {
+    return ["#NoKeywordsFound"];
+  }
 
-  textArray.forEach((line) => {
-    const doc = nlp.readDoc(line.toLowerCase());
-    const tokens = doc.tokens().filter((token) => {
-      const pos = token.out(its.pos);
-      const w = token.out(its.value);
+  console.log("Combined text for keyword extraction:", combinedText);
+
+  // RAKE may return null or undefined if text is empty or no keywords found
+  let keywords;
+  try {
+    keywords = rake.generate(combinedText);
+  } catch (err) {
+    console.error("RAKE extraction failed:", err);
+    keywords = [];
+  }
+
+  if (!Array.isArray(keywords)) {
+    console.warn("RAKE returned non-array result, resetting to empty array");
+    keywords = [];
+  }
+
+  console.log("Extracted keywords/phrases:", keywords);
+
+  // Defensive: if no keywords found, return placeholder hashtag
+  if (keywords.length === 0) {
+    return ["#NoKeywordsFound"];
+  }
+
+  // Format keywords as hashtags
+  const hashtags = keywords
+    .map((phrase) => {
+      if (typeof phrase !== "string") return null;
+      const cleaned = phrase.replace(/[^a-z0-9]/gi, "");
+      if (cleaned.length < 2) return null;
       return (
-        pos === "NOUN" ||
-        pos === "PROPN" ||
-        (pos === "ADJ" && w.length > 4) ||
-        (pos === "VERB" && w.length > 4)
+        "#" + cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase()
       );
-    });
-    tokens.out().forEach((keyword) => {
-      const cleaned = keyword.replace(/[^a-z0-9]/gi, "");
-      if (cleaned.length >= 2) {
-        hashtags.push("#" + cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase());
-      }
-    });
-  });
+    })
+    .filter(Boolean)
+    .slice(0, topN);
 
-  // Deduplicate and limit to topN without ranking
-  const uniqueHashtags = Array.from(new Set(hashtags)).slice(0, topN);
-
-  return uniqueHashtags;
+  return hashtags;
 }
 
 
@@ -308,7 +427,6 @@ app.post(
       const subtitleTexts = subtitles.subtitles.map((item) => item.text);
       console.log("Extracted subtitle texts:", subtitleTexts);
       const hashtags = generateHashtagsFromArray(subtitleTexts, 5);
-
       console.log("Generated hashtags:", hashtags);
       // Return ONLY subtitles object
       res.json({
