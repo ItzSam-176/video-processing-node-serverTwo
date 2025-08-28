@@ -241,18 +241,31 @@ const moderationService = require("./services/moderationService");
 //   return hashtags;
 // }
 
+function cleanSubtitleText(textArray) {
+  return textArray
+    .map((line) =>
+      line
+        .replace(/^\s*[-'"\u2018\u2019\u201C\u201D]\s*/, "") // Remove leading - or quotes
+        .replace(/\s+/g, " ") // Normalize whitespace
+        .replace(/\(.*?\)/g, "") // Remove parenthetical expressions e.g. (suspenseful music)
+        .trim()
+    )
+    .filter((line) => line.length > 0);
+}
+
+
+
 function generateHashtagsFromArray(textArray, topN = 5) {
   if (!Array.isArray(textArray) || textArray.length === 0) {
-    console.log("Warning: textArray is empty or not an array");
+    console.log("Warning: textArray is empty or invalid");
     return ["#NoHashtags"];
   }
-
-  const combinedText = textArray.filter(Boolean).join(". ").trim();
-  if (!combinedText) {
-    return ["#NoKeywordsFound"];
-  }
-
-  console.log("Combined text for keyword extraction:", combinedText);
+  const cleanedTexts = cleanSubtitleText(textArray);
+  if (cleanedTexts.length === 0) return ["#NoHashtags"];
+  console.log("Cleaned subtitle texts:", cleanedTexts);
+  const combinedText = cleanedTexts.join(". ").trim();
+  if (!combinedText) return ["#NoHashtags"];
+  console.log("Combined text for RAKE:", combinedText);
 
   // RAKE may return null or undefined if text is empty or no keywords found
   let keywords;
