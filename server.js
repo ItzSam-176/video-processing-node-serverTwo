@@ -666,7 +666,7 @@ app.post(
                 await moderationService.extractAndTranscribeAudio(
                   req.file.path
                 );
-              const validSubs = (audioTranscription || ['No Subs Generated']).filter(
+              const validSubs = (audioTranscription || ['No Subtitle Generated']).filter(
                 (subtitle) =>
                   subtitle &&
                   typeof subtitle === "object" &&
