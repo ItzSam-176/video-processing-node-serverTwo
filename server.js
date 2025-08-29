@@ -3,7 +3,6 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs-extra");
 const { englishDataset } = require("obscenity");
-// const TfIdf = require("tf-idf-search");
 const rake = require("node-rake");
 
 const app = express();
